@@ -974,6 +974,12 @@ pub struct Player {
     /// heal in full.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub overheal: Vec<Overheal>,
+    /// MythicSim's Forever results: the party's mana totems whose MP5 the player's mana ticks
+    /// carry, so each tick's share from them is reported under the totem rather than as plain
+    /// regeneration (`prepare::mp5_sources`). Attribution only: the mana gained is the same.
+    /// Empty is the Go reference, which reports all of it as regeneration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mp5_sources: Vec<Mp5Source>,
     /// MythicSim's healer sims under Forever's rules: the length of the window burst healing
     /// per second is measured over, in nanoseconds (`prepare::burst_hps`). None reports no burst,
     /// as Go does not.
@@ -1422,6 +1428,19 @@ pub struct Overheal {
     pub spell_id: i32,
     /// The share of each heal that is overhealing, from zero to below one.
     pub fraction: f64,
+}
+
+/// A buff whose MP5 the player's mana ticks carry, reported in resource metrics of its own.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Mp5Source {
+    /// The metrics the buff's share of each tick lands in.
+    pub action_id: ActionId,
+    /// The MP5 the buff adds while it is up.
+    pub mp5: f64,
+    /// The stat aura whose bit says the buff is up; none for a permanent buff, always up.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aura: Option<String>,
 }
 
 /// One heal rank a healer casts on the player, in MythicSim's healer sims (Rust only, no Go

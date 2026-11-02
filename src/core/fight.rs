@@ -41,6 +41,7 @@ mod log;
 pub(crate) mod melee;
 pub(crate) mod metrics;
 pub(crate) mod movement;
+pub(crate) mod mp5_sources;
 mod oil_of_immolation;
 pub(crate) mod pet;
 mod power_infusion;
@@ -2000,6 +2001,9 @@ pub(crate) struct Fight<A: Agent> {
     pub(crate) hp_percent_for_defensives: f64,
     /// Forever's rule for casting regeneration auras (see [`casting_regen`]).
     pub(crate) casting_regen_at_once: bool,
+    /// The party's mana totems whose share of each mana tick the results name (see
+    /// [`mp5_sources`]).
+    pub(crate) mp5_sources: Vec<mp5_sources::Mp5Source>,
     /// Forever's rule that a rotation's move waits for a queued spell to fire.
     pub(crate) move_waits_for_queued_cast: bool,
     /// Forever's rule that a melee swing leaves the Auto Shot timer alone.
@@ -4240,6 +4244,7 @@ impl<A: Agent> Fight<A> {
             health_at_reset: player.health_at_reset,
             hp_percent_for_defensives: player.hp_percent_for_defensives,
             casting_regen_at_once: player.casting_regen_at_once,
+            mp5_sources: Vec::new(),
             move_waits_for_queued_cast: player.move_waits_for_queued_cast,
             melee_keeps_auto_shot_timer: player.melee_keeps_auto_shot_timer,
             move_arrives_at_destination: player.move_arrives_at_destination,
@@ -4269,6 +4274,7 @@ impl<A: Agent> Fight<A> {
         if let Some(energy) = &player.energy {
             fight.enable_energy_bar(energy);
         }
+        fight.bind_mp5_sources(&player.mp5_sources, &stat_places)?;
         for effect in effects {
             let (rng_label, chances, resource, amount, metrics_action_id, delay_ns) = match effect {
                 Effect::EnergizeProc {
