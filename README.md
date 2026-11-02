@@ -521,7 +521,29 @@ the Go goldens and exporter uses. The departures:
   where it is magic and its ticks deal their amount, one around the wielder goes on every target,
   and one a missile carries goes on as the hit lands, its flight not modelled.
   `docs/forever-chance-on-hit.md` lists the items by kind and those left out with the reason
-  (crowd control, threat, mana, heals, debuffs only a tank feels).
+  (crowd control, threat, mana, heals, debuffs only a tank feels). A wearer buff that changes
+  stats (Destiny's Strength, Quel'Serrar's Armor and Attack Power, Ragehammer's Attack Power) is
+  a stat aura, so its stats reach the runtime and a tank's swing rolls are read with it up
+  (`chance_on_hit_stat_auras`, `src/prepare/export_items.rs`). Quel'Serrar's Sanctuary (22850)
+  also grants 13 Defense (`A_MOD_SKILL` of skill line 95), which the effect parser leaves out;
+  it is added to the buff (`src/prepare/forever_items.rs`). A tank's swing rolls read it, and
+  the stat aura combinations carry the crit the player takes when one changes it, which the
+  runtime sets on a Goblin Sapper Charge's hit on its thrower. Its 36 melee Attack Power against
+  Dragonkin (aura 102, creature mask 2) is a `mob_type_bonus` with `melee_attack_power` while the
+  buff is up and every target is Dragonkin; ranged attacks do not read it.
+- Stat aura combinations up to 16 bits, where the reference refuses past 14: an Orc
+  Enhancement Shaman with Jom Gabbar takes 15 (the totems, the swap, the imbues and the potion
+  10, Blood Fury 1, Jom Gabbar's stacks 4). Each bit doubles the reset simulations: 15 bits
+  prepare in about 5 seconds (`src/prepare/stat_auras.rs`).
+- The Black Book (19337) as the Forever client states it: Blessing of the Black Book (23720)
+  lands on the demon that is out, every effect of its row on the pet, 100% more damage done in
+  every school (aura 79) and 100% more armor (aura 101) for 30 sec, and the item's use is on a 5
+  minute cooldown and its category's 30 seconds (client 70707 ItemEffect 102765). The pinned
+  reference registers Classic's book instead (200 spell damage, 325 attack power and 1600 armor
+  on each demon, a 3 minute cooldown, a warlock aura no effect describes), which the reference
+  rules keep and still refuse. Under Forever's rules the use waits for a demon out and doubles its
+  damage (`black_book`, `src/classes/warlock/prepare/items.rs`); the armor is read by nothing, as
+  nothing swings at the demon.
 - Forever's Engineering ammo, from the Wowhead Forever tooltips: Swiftfeather Arrow (274387) and
   Swiftstrike Shot (274388), item level 65 and requiring level 60, each "Adds 24.5 damage per
   second". The reference's ammo stops at Miniature Cannon Balls, so the request schema adds them

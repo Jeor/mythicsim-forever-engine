@@ -26,6 +26,7 @@ const EFFECTS: &[&str] = &[
     "bane_of_agony",
     "bane_of_doom",
     "bane_of_havoc",
+    "black_book",
     "conflagrate",
     "corruption",
     "curse_of_recklessness",
@@ -56,6 +57,11 @@ const EFFECTS: &[&str] = &[
 
 /// The effect kind whose implementation executes a Warlock spell.
 fn spell_capability(spell: &Spell) -> Option<&'static str> {
+    // items.go The Black Book, which the warlock package registers itself.
+    let id = spell.action_id.clone().unwrap_or_default();
+    if id.item_id == 19337 && id.tag == 0 {
+        return Some("black_book");
+    }
     let damage = spell.damage_effect.is_some();
     let dot = spell.dot.is_some();
     match spell.class_spell.as_deref()? {
@@ -121,6 +127,7 @@ fn claims(effect: &Effect) -> Vec<(&'static str, &str)> {
         Effect::BaneOfHavoc {
             aura, copy_aura, ..
         } => vec![("target", aura), ("player", copy_aura)],
+        Effect::BlackBook { aura, .. } => vec![("pet", aura)],
         Effect::DemonicBrand {
             trigger_aura,
             consumer_aura,

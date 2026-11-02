@@ -1997,18 +1997,9 @@ fn chance_on_hit_dot_shape(
     Some(shape)
 }
 
-/// Under Forever's rules: the chance on hit items `CHANCE_ON_HIT_ITEMS` registers
-/// (forever_items.rs), which the reference leaves unregistered. Each weapon or item proc rolls its
-/// manager's chance on the landed hits it hears, at the rate MythicSim assumes, and at once on the
-/// hit casts its damage spell, activates its buff (and its attack speed, where the buff changes
-/// it) or puts its armor debuff on the unit hit.
-fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>) -> Vec<Value> {
-    use super::shared_items::ProcKind;
-    let mut effects = Vec::new();
-    if env.sim.rules != super::sim::Rules::Forever {
-        return effects;
-    }
-    // The worn items, then with an item swap the swap set's, as item_effects.rs registers them.
+/// The worn items, then with an item swap the swap set's, once each, as item_effects.rs
+/// registers them.
+fn chance_on_hit_items(env: &Environment) -> Vec<i32> {
     let mut items: Vec<i32> = env
         .sim
         .character(env.player)
@@ -2021,10 +2012,103 @@ fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>
     }
     let mut seen = Vec::new();
     for item in items {
-        if item == 0 || seen.contains(&item) {
-            continue;
+        if item != 0 && !seen.contains(&item) {
+            seen.push(item);
         }
-        seen.push(item);
+    }
+    seen
+}
+
+/// Under Forever's rules, the buffs of the chance on hit items whose `stat_proc` effect
+/// [`chance_on_hit_item_effects`] describes and whose gain changes the wearer's stats, each read
+/// from a reset simulation of its own: Destiny's Strength, Quel'Serrar's Defense, Armor and
+/// Attack Power. The `stat_proc` effect only activates the aura, so its stats reach the runtime as
+/// a stat aura, and a tank's swing rolls follow its Defense and Armor.
+pub(crate) fn chance_on_hit_stat_auras(env: &Environment) -> Vec<String> {
+    use super::shared_items::ProcKind;
+    let mut labels = Vec::new();
+    if env.sim.rules != super::sim::Rules::Forever {
+        return labels;
+    }
+    for item in chance_on_hit_items(env) {
+        for (kind, cfg) in super::forever_items::chance_on_hit_registrations(item) {
+            if !matches!(kind, ProcKind::Proc | ProcKind::Aura) {
+                continue;
+            }
+            let label = spell_data_stat_proc_aura(cfg.name);
+            let described = aura_named(env, cfg.name)
+                .map(|trigger| env.sim.aura(trigger))
+                .is_some_and(|trigger| trigger.dpm.is_some() && trigger.icd.is_none())
+                && aura_named(env, &label).is_some_and(|aura| env.sim.aura(aura).max_stacks == 0);
+            if !described || labels.contains(&label) {
+                continue;
+            }
+            let mut fresh = env.fresh();
+            let player = fresh.player;
+            let aura = fresh.sim.get_aura(player, &label).expect("the aura exists");
+            let before = fresh.sim.unit(player).stats;
+            fresh.sim.activate(aura);
+            if fresh.sim.unit(player).stats != before {
+                labels.push(label);
+            }
+        }
+    }
+    labels
+}
+
+/// The client's creature types (`CreatureType`), by the bit a creature type mask gives each,
+/// as the request names them.
+const CREATURE_TYPES: [(i32, &str); 9] = [
+    (1, "MobTypeBeast"),
+    (2, "MobTypeDragonkin"),
+    (3, "MobTypeDemon"),
+    (4, "MobTypeElemental"),
+    (5, "MobTypeGiant"),
+    (6, "MobTypeUndead"),
+    (7, "MobTypeHumanoid"),
+    (8, "MobTypeCritter"),
+    (9, "MobTypeMechanical"),
+];
+
+/// A chance on hit buff's melee attack power against creature types
+/// (`A_MOD_MELEE_ATTACK_POWER_VERSUS`, its mask in the misc value), which the parsed aura leaves
+/// out: Quel'Serrar's Sanctuary grants 36 against Dragonkin (22850, mask 2). It holds when every
+/// target is of a type the mask names, as a fight's targets are of one type.
+fn melee_power_versus_targets(env: &Environment, row: &Spell) -> Option<f64> {
+    let named = |mask: i32, target: UnitId| {
+        let mob_type = env.sim.unit(target).mob_type.as_str();
+        CREATURE_TYPES
+            .iter()
+            .any(|(id, name)| mask & (1 << (id - 1)) != 0 && *name == mob_type)
+    };
+    let power: f64 = row
+        .effects
+        .iter()
+        .filter(|effect| {
+            effect.aura == dbcenums::A_MOD_MELEE_ATTACK_POWER_VERSUS
+                && env
+                    .encounter
+                    .targets
+                    .iter()
+                    .all(|&target| named(effect.misc, target))
+        })
+        .map(|effect| effect.average(env.sim.unit(env.player).level))
+        .sum();
+    (power != 0.0).then_some(power)
+}
+
+/// Under Forever's rules: the chance on hit items `CHANCE_ON_HIT_ITEMS` registers
+/// (forever_items.rs), which the reference leaves unregistered. Each weapon or item proc rolls its
+/// manager's chance on the landed hits it hears, at the rate MythicSim assumes, and at once on the
+/// hit casts its damage spell, activates its buff (and its attack speed, where the buff changes
+/// it) or puts its armor debuff on the unit hit.
+fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>) -> Vec<Value> {
+    use super::shared_items::ProcKind;
+    let mut effects = Vec::new();
+    if env.sim.rules != super::sim::Rules::Forever {
+        return effects;
+    }
+    for item in chance_on_hit_items(env) {
         for (kind, cfg) in super::forever_items::chance_on_hit_registrations(item) {
             let Some(trigger) = aura_named(env, cfg.name) else {
                 continue;
@@ -2082,6 +2166,13 @@ fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>
                         "kind": "stat_proc", "trigger_aura": trigger.label,
                         "rng_label": trigger.label, "aura": aura.label, "chances": chances,
                     }));
+                    if let Some(power) = melee_power_versus_targets(env, row) {
+                        effects.push(json!({
+                            "kind": "mob_type_bonus", "aura": aura.label, "attack_power": 0.0,
+                            "ranged_attack_power": 0.0, "spell_damage": 0.0,
+                            "melee_attack_power": power,
+                        }));
+                    }
                     let melee: f64 = row
                         .effects
                         .iter()

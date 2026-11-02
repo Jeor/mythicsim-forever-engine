@@ -1236,7 +1236,7 @@ impl<A: Agent> Fight<A> {
     /// Go `getAttackPowerValueImpl` of an acting unit, with the player's mob type bonus.
     pub(crate) fn melee_attack_power_of(&self, side: Side) -> f64 {
         let bonus = if side == Side::Player {
-            self.mob_type_attack_power()
+            self.mob_type_attack_power() + self.mob_type_melee_attack_power()
         } else {
             0.0
         };
@@ -1252,6 +1252,15 @@ impl<A: Agent> Fight<A> {
             .iter()
             .filter(|(aura, _, _)| self.aura(*aura).active)
             .map(|(_, attack_power, _)| attack_power)
+            .sum()
+    }
+
+    /// Under Forever's rules, the player's melee attack power against the targets' type alone.
+    pub(crate) fn mob_type_melee_attack_power(&self) -> f64 {
+        self.mob_type_melee_bonuses
+            .iter()
+            .filter(|(aura, _)| self.aura(*aura).active)
+            .map(|(_, attack_power)| attack_power)
             .sum()
     }
 

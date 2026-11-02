@@ -12,7 +12,10 @@ use std::{fs, path::Path};
 mod paladin_113554;
 
 /// The paladin requests recorded with push 113554's talent tree.
-const RECORDED_IN_113554: &[&str] = &["retribution-paladin-swap-dark-iron-sunderer"];
+const RECORDED_IN_113554: &[&str] = &[
+    "retribution-paladin-swap-dark-iron-sunderer",
+    "protection-paladin-quel-serrar",
+];
 
 fn request(name: &str) -> Value {
     let path = Path::new(concat!(
@@ -924,4 +927,170 @@ fn a_rogues_own_cooldowns_cast_at_the_player() {
     for spell in [1856, 13750, 13877] {
         assert!(action(&player, spell, 0).0 >= 50.0, "spell {spell}");
     }
+}
+
+/// The stat aura combination with only `label` up, and the one with no aura up.
+fn alone_and_base<'a>(prepared: &'a Value, label: &str) -> (usize, &'a Value, &'a Value) {
+    let stat_auras = effects(prepared, "stat_auras");
+    assert_eq!(stat_auras.len(), 1);
+    let auras = stat_auras[0]["auras"].as_array().unwrap();
+    let bit = auras
+        .iter()
+        .position(|aura| aura == label)
+        .unwrap_or_else(|| panic!("{label} is no stat aura: {auras:?}"));
+    let combos = &stat_auras[0]["combos"];
+    (bit, &combos[1 << bit], &combos[0])
+}
+
+/// Quel'Serrar on a Protection Paladin tank (production sims 0f6efd63, 338079ed, eadd22f1 and
+/// 1524d32a, 1 November 2026): its Sanctuary (22850) grants 13 Defense, 300 Armor and 30 Attack
+/// Power, and its Defense and Armor change the target's swings, which the gate refused. The buff
+/// is now a stat aura, so the swing rolls are read with it up: 13 Defense moves the miss, dodge,
+/// parry and block chances up and the crit chance down by 0.52% each, and the Armor lowers the
+/// armor multiplier.
+#[test]
+fn quel_serrars_sanctuary_changes_the_targets_swings() {
+    let (value, player) = run("protection-paladin-quel-serrar");
+    let (bit, alone, base) = alone_and_base(&value, "Quel'Serrar Proc");
+    let power = |combo: &Value| combo["AttackPower"].as_f64().unwrap();
+    assert_eq!(power(alone) - power(base), 30.0);
+    let rolls = value["enemy"]["rolls"].as_array().unwrap();
+    let (up, down) = (&rolls[1 << bit], &rolls[0]);
+    for (step, sign) in [
+        ("miss_chance", 1.0),
+        ("dodge_chance", 1.0),
+        ("parry_chance", 1.0),
+        ("block_chance", 1.0),
+        ("crit_chance", -1.0),
+    ] {
+        let moved = up[step].as_f64().unwrap() - down[step].as_f64().unwrap();
+        assert!((moved - sign * 0.0052).abs() < 1e-9, "{step} moved {moved}");
+    }
+    assert!(up["armor_multiplier"].as_f64().unwrap() < down["armor_multiplier"].as_f64().unwrap());
+    assert!(aura_uptime(&player, 22850) > 0.0);
+}
+
+/// Destiny (647) on a Warrior who does not tank: the chance on hit's buff (17152, Strength 200)
+/// was activated but read as no stat aura, so its Strength never reached the runtime. It is now
+/// one, as Quel'Serrar's is, without the Defense, which only the target's swings at a tank read.
+#[test]
+fn destinys_strength_reaches_the_runtime() {
+    let value = edited(
+        "dps-warrior-mark-of-the-champion-undead",
+        &[(r#""id":235480"#, r#""id":647"#)],
+    );
+    let prepared = prepare_json_with(value.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    let (_, alone, base) = alone_and_base(&prepared, "Destiny Proc");
+    assert!(
+        alone["AttackPower"].as_f64().unwrap() > base["AttackPower"].as_f64().unwrap(),
+        "{alone} {base}"
+    );
+    let player = run_prepared(&prepared)["raidMetrics"]["parties"][0]["players"][0].clone();
+    assert!(aura_uptime(&player, 17152) > 0.0);
+}
+
+/// The Black Book on a Demonology Warlock with the Imp out (production sim f0aad096, 1 November
+/// 2026): its use had no exported effect. Under Forever's rules its Blessing (23720) doubles the
+/// demon's damage done in every school for 30 sec, on a 5 minute cooldown (client 70707), so a
+/// two minute fight casts it once and the Imp's Firebolt deals more than without the book.
+#[test]
+fn the_black_book_doubles_the_demons_damage() {
+    let (value, player) = run("demonology-warlock-black-book");
+    let book = effects(&value, "black_book");
+    assert_eq!(book.len(), 1, "{book:?}");
+    assert_eq!(book[0]["aura"], "Blessing of the Black Book");
+    assert_eq!(book[0]["damage_multiplier"], json!(2.0));
+    let uses: f64 = player["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|action| action["id"]["itemId"] == 19337)
+        .flat_map(|action| action["targets"].as_array().unwrap())
+        .map(|target| target["casts"].as_f64().unwrap_or(0.0))
+        .sum();
+    assert_eq!(uses, 50.0, "one use in each of the 50 iterations");
+    let without = run_request(&edited(
+        "demonology-warlock-black-book",
+        &[(r#"{"id":19337}"#, "{}")],
+    ));
+    let firebolt = |player: &Value| {
+        player["pets"][0]["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|action| action["targets"].as_array().unwrap())
+            .map(|target| target["damage"].as_f64().unwrap_or(0.0))
+            .sum::<f64>()
+    };
+    assert!(
+        firebolt(&player) > 1.15 * firebolt(&without),
+        "{} {}",
+        firebolt(&player),
+        firebolt(&without)
+    );
+    // The reference's Classic Black Book has no such effect, so its rules still refuse it.
+    let reference = request("demonology-warlock-black-book").to_string();
+    let refused = prepare_json_with(reference.as_bytes(), "rust", Rules::GoReference).unwrap_err();
+    assert!(
+        format!("{refused:?}").contains("major cooldown item 19337 has no exported effect"),
+        "{refused:?}"
+    );
+}
+
+/// Quel'Serrar on a Warrior who does not tank and throws Goblin Sapper Charges, against
+/// Dragonkin: the Sanctuary's 13 Defense lowers the crit the sapper's hit on its thrower takes by
+/// 0.52%, which the stat aura combinations carry, and its 36 melee attack power against Dragonkin
+/// (22850, aura 102 of mask 2) holds while it is up. Against Undead the bonus is not exported.
+#[test]
+fn quel_serrar_off_a_tank_against_dragonkin() {
+    let quel_serrar = (r#""id":235480"#, r#""id":18348"#);
+    let dragonkin = (
+        r#""mobType":"MobTypeUndead""#,
+        r#""mobType":"MobTypeDragonkin""#,
+    );
+    let value = edited(
+        "dps-warrior-mark-of-the-champion-undead",
+        &[quel_serrar, dragonkin],
+    );
+    let prepared = prepare_json_with(value.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    assert_eq!(effects(&prepared, "goblin_sapper").len(), 1);
+    let (_, alone, base) = alone_and_base(&prepared, "Quel'Serrar Proc");
+    let taken = |combo: &Value| combo["PseudoReducedCritTakenPercent"].as_f64().unwrap();
+    assert!(
+        (taken(alone) - taken(base) - 0.0052).abs() < 1e-12,
+        "{alone} {base}"
+    );
+    let bonuses = effects(&prepared, "mob_type_bonus");
+    let bonus = bonuses
+        .iter()
+        .find(|effect| effect["aura"] == "Quel'Serrar Proc")
+        .unwrap_or_else(|| panic!("{bonuses:?}"));
+    assert_eq!(bonus["melee_attack_power"], json!(36.0));
+    assert_eq!(bonus["ranged_attack_power"], json!(0.0));
+    run_prepared(&prepared);
+    let undead = edited("dps-warrior-mark-of-the-champion-undead", &[quel_serrar]);
+    let undead = prepare_json_with(undead.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    assert!(effects(&undead, "mob_type_bonus")
+        .iter()
+        .all(|effect| effect["aura"] != "Quel'Serrar Proc"));
+}
+
+/// An Orc Enhancement Shaman with Jom Gabbar (production sim ff415e0d, 1 November 2026): the
+/// totems, the swap, the imbues and the potion take 10 stat aura bits, Blood Fury one and Jom
+/// Gabbar's stacks four, 15 in all, past the reference's 14. Forever's rules combine up to 16.
+#[test]
+fn fifteen_stat_aura_bits_run() {
+    let (value, _) = run("enhancement-shaman-fifteen-stat-aura-bits");
+    let stat_auras = effects(&value, "stat_auras");
+    let auras = stat_auras[0]["auras"].as_array().unwrap();
+    for label in ["Blood Fury", "Jom Gabbar"] {
+        assert!(auras.contains(&json!(label)), "{auras:?}");
+    }
+    assert_eq!(stat_auras[0]["combos"].as_array().unwrap().len(), 1 << 15);
+    let reference = request("enhancement-shaman-fifteen-stat-aura-bits").to_string();
+    let refused = prepare_json_with(reference.as_bytes(), "rust", Rules::GoReference).unwrap_err();
+    assert!(
+        format!("{refused:?}").contains("exceed the combination limit"),
+        "{refused:?}"
+    );
 }

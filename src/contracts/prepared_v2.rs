@@ -2880,6 +2880,11 @@ pub enum Effect {
         attack_power: f64,
         ranged_attack_power: f64,
         spell_damage: f64,
+        /// Under Forever's rules, melee attack power against the targets' type alone
+        /// (`A_MOD_MELEE_ATTACK_POWER_VERSUS`), as Quel'Serrar's Sanctuary grants against
+        /// Dragonkin; ranged attacks do not read it.
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        melee_attack_power: f64,
     },
     /// core/enchant_speed.go `registerSpeedAura` (Forever's rules, with an item swap): an item
     /// or enchant's speed aura multiplies the melee, ranged and cast speed while up. The one
@@ -3804,6 +3809,13 @@ pub enum Effect {
         spell_power_coefficient: f64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         school_power_stat: Option<String>,
+    },
+    /// The Black Book under Forever's rules: its use, which waits for a demon out, activates
+    /// the demon's aura, which multiplies the demon's damage done in every school while up.
+    BlackBook {
+        item_id: i32,
+        aura: String,
+        damage_multiplier: f64,
     },
     /// The summoned demon's AI: the first ability it can cast while its mana stays above
     /// `min_mana`, otherwise a wait.
@@ -5509,6 +5521,7 @@ impl Effect {
             Effect::AimedShot { .. } => "aimed_shot",
             Effect::ArcaneShot { .. } => "arcane_shot",
             Effect::RenatakisCharm { .. } => "renatakis_charm",
+            Effect::BlackBook { .. } => "black_book",
             Effect::HunterSetManaProc { .. } => "hunter_set_mana_proc",
             Effect::SniperShot { .. } => "sniper_shot",
             Effect::MultiShot { .. } => "multi_shot",

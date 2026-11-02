@@ -1924,6 +1924,9 @@ pub(crate) struct Fight<A: Agent> {
     /// Go `AttackTable.MobTypeBonusStats` from Mark of the Champion: each aura and its ranged
     /// attack power (which Go's melee attack power reads too) and spell damage bonus.
     pub(crate) mob_type_bonuses: Vec<(AuraRef, f64, f64)>,
+    /// Under Forever's rules, the auras whose melee attack power holds against the targets'
+    /// type alone, and that attack power.
+    pub(crate) mob_type_melee_bonuses: Vec<(AuraRef, f64)>,
     /// Item damage procs built from client rows, by their aura's position.
     pub(crate) damage_procs: Vec<DamageProc>,
     /// Enchant heal procs, by their position among the heal proc effects.
@@ -1956,6 +1959,9 @@ pub(crate) struct Fight<A: Agent> {
     /// The player's Intellect for each combination, when one changes it: Go refreshes the
     /// cached mana regeneration rates whenever a dynamic change moves it.
     stat_intellect: Vec<Option<f64>>,
+    /// The crit the player takes by combination, when one changes it: the Goblin Sapper Charge's
+    /// hit on its thrower reads it.
+    stat_crit_taken: Vec<Option<f64>>,
     /// The player's school spell damage stats for each combination, when one changes them.
     pub(crate) stat_school_damage: Vec<Option<[f64; 8]>>,
     /// The player's resistances for each combination that a combination changes, by Go
@@ -3270,6 +3276,11 @@ impl<A: Agent> Fight<A> {
             .iter()
             .map(|combo| combo.get("Intellect").copied())
             .collect();
+        // Under Forever's rules the crit the player takes, when a combination changes it.
+        let stat_crit_taken: Vec<Option<f64>> = stat_combos
+            .iter()
+            .map(|combo| combo.get("PseudoReducedCritTakenPercent").copied())
+            .collect();
         // And each school spell damage and resistance stat only when a combination changes it;
         // the others keep their reset values.
         let by_school = |names: &[(usize, &str)], base: [f64; 8]| -> Vec<Option<[f64; 8]>> {
@@ -4150,6 +4161,7 @@ impl<A: Agent> Fight<A> {
             stat_health,
             stat_spirit,
             stat_intellect,
+            stat_crit_taken,
             stat_school_damage,
             stat_resistance,
             stat_mask: 0,
@@ -4174,6 +4186,7 @@ impl<A: Agent> Fight<A> {
             revelation: None,
             mob_type_spell_damage: None,
             mob_type_bonuses: Vec::new(),
+            mob_type_melee_bonuses: Vec::new(),
             damage_procs: Vec::new(),
             spell_stat_procs: Vec::new(),
             aura_mods: Vec::new(),
@@ -4893,12 +4906,20 @@ impl<A: Agent> Fight<A> {
                     aura,
                     ranged_attack_power,
                     spell_damage,
+                    melee_attack_power,
                     ..
                 } => {
                     let aura = fight.player_aura(aura)?;
-                    fight
-                        .mob_type_bonuses
-                        .push((aura, *ranged_attack_power, *spell_damage));
+                    if *ranged_attack_power != 0.0 || *spell_damage != 0.0 {
+                        fight
+                            .mob_type_bonuses
+                            .push((aura, *ranged_attack_power, *spell_damage));
+                    }
+                    if *melee_attack_power != 0.0 {
+                        fight
+                            .mob_type_melee_bonuses
+                            .push((aura, *melee_attack_power));
+                    }
                 }
                 Effect::EmeraldDragonWhelp { .. } => fight.bind_whelp(effect)?,
                 Effect::Revelation { .. } => fight.bind_revelation(effect)?,
@@ -5256,6 +5277,12 @@ impl<A: Agent> Fight<A> {
         self.set_player_powers(self.stat_combos[mask as usize]);
         if let Some(path) = self.mp5_path.as_mut() {
             self.player.powers.mp5 = path.change(changed, mask);
+        }
+        if let (Some(Some(crit_taken)), Some(target)) = (
+            self.stat_crit_taken.get(mask as usize),
+            self.self_target.as_mut(),
+        ) {
+            target.reduced_crit_taken_percent = *crit_taken;
         }
         if self.has_mana_bar() && self.player.mana > self.player.powers.max_mana {
             self.player.mana = self.player.powers.max_mana;
