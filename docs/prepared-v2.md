@@ -295,6 +295,7 @@ the spell itself. `rotation` is the request's APL in protojson form.
 | `fel_energy` | sim/warlock/talents_demonology.go | The Voidwalker sacrifice's share of maximum mana and period, from its periodic action |
 | `decimation` | sim/warlock/talents_demonology.go | The trigger spells, the 35% execute phase, and the aura's damage and Soul Fire cast time modifiers with the spells each names |
 | `demonic_brand` | sim/warlock/talents_demonology.go | The trigger spells, the target brand and its charges, the demon's marker and consumer auras, and the brand hit's roll and spell power share, Go literals |
+| `black_book` | Forever rules | The Black Book's use: the demon aura (Blessing of the Black Book, 23720) it activates on the demon out and the damage done multiplier of its row for every school (2). The use waits for a demon out; the row's armor is read by nothing, as nothing swings at the demon |
 | `mind_blast`, `shadow_word_death` | sim/priest/mind_blast.go, shadow_word_death.go | Damage rolls on every rank; Early Demise's crit inside the 20% execute phase |
 | `shadow_word_pain`, `devouring_plague`, `mind_flay` | sim/priest/shadow_word_pain.go, devouring_plague.go, talents_shadow.go | Each rank's dot base and Periodic Can Crit; the hit rolls once without a hit count; Devouring Plague heals for its ticks under a tagged action; Mind Flay is a binary channel |
 | `shadowform` | sim/priest/talents_shadow.go | Damage, cost and crit damage modifiers with the spells each names; its form refuses the spells whose `requirement_auras` name it |

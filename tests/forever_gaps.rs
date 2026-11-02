@@ -988,3 +988,51 @@ fn destinys_strength_reaches_the_runtime() {
     let player = run_prepared(&prepared)["raidMetrics"]["parties"][0]["players"][0].clone();
     assert!(aura_uptime(&player, 17152) > 0.0);
 }
+
+/// The Black Book on a Demonology Warlock with the Imp out (production sim f0aad096, 1 November
+/// 2026): its use had no exported effect. Under Forever's rules its Blessing (23720) doubles the
+/// demon's damage done in every school for 30 sec, on a 5 minute cooldown (client 70707), so a
+/// two minute fight casts it once and the Imp's Firebolt deals more than without the book.
+#[test]
+fn the_black_book_doubles_the_demons_damage() {
+    let (value, player) = run("demonology-warlock-black-book");
+    let book = effects(&value, "black_book");
+    assert_eq!(book.len(), 1, "{book:?}");
+    assert_eq!(book[0]["aura"], "Blessing of the Black Book");
+    assert_eq!(book[0]["damage_multiplier"], json!(2.0));
+    let uses: f64 = player["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|action| action["id"]["itemId"] == 19337)
+        .flat_map(|action| action["targets"].as_array().unwrap())
+        .map(|target| target["casts"].as_f64().unwrap_or(0.0))
+        .sum();
+    assert_eq!(uses, 50.0, "one use in each of the 50 iterations");
+    let without = run_request(&edited(
+        "demonology-warlock-black-book",
+        &[(r#"{"id":19337}"#, "{}")],
+    ));
+    let firebolt = |player: &Value| {
+        player["pets"][0]["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|action| action["targets"].as_array().unwrap())
+            .map(|target| target["damage"].as_f64().unwrap_or(0.0))
+            .sum::<f64>()
+    };
+    assert!(
+        firebolt(&player) > 1.15 * firebolt(&without),
+        "{} {}",
+        firebolt(&player),
+        firebolt(&without)
+    );
+    // The reference's Classic Black Book has no such effect, so its rules still refuse it.
+    let reference = request("demonology-warlock-black-book").to_string();
+    let refused = prepare_json_with(reference.as_bytes(), "rust", Rules::GoReference).unwrap_err();
+    assert!(
+        format!("{refused:?}").contains("major cooldown item 19337 has no exported effect"),
+        "{refused:?}"
+    );
+}

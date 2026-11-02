@@ -529,6 +529,15 @@ the Go goldens and exporter uses. The departures:
   it is added while the wearer tanks the target, whose swings read it, and left out otherwise,
   where only a Goblin Sapper Charge's hit on its thrower would read it
   (`src/prepare/forever_items.rs`). The 36 Attack Power against Dragonkin is not modelled.
+- The Black Book (19337) as the Forever client states it: Blessing of the Black Book (23720)
+  lands on the demon that is out, every effect of its row on the pet, 100% more damage done in
+  every school (aura 79) and 100% more armor (aura 101) for 30 sec, and the item's use is on a 5
+  minute cooldown and its category's 30 seconds (client 70707 ItemEffect 102765). The pinned
+  reference registers Classic's book instead (200 spell damage, 325 attack power and 1600 armor
+  on each demon, a 3 minute cooldown, a warlock aura no effect describes), which the reference
+  rules keep and still refuse. Under Forever's rules the use waits for a demon out and doubles its
+  damage (`black_book`, `src/classes/warlock/prepare/items.rs`); the armor is read by nothing, as
+  nothing swings at the demon.
 - Forever's Engineering ammo, from the Wowhead Forever tooltips: Swiftfeather Arrow (274387) and
   Swiftstrike Shot (274388), item level 65 and requiring level 60, each "Adds 24.5 damage per
   second". The reference's ammo stops at Miniature Cannon Balls, so the request schema adds them

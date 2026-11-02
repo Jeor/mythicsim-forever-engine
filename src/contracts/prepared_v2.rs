@@ -3805,6 +3805,13 @@ pub enum Effect {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         school_power_stat: Option<String>,
     },
+    /// The Black Book under Forever's rules: its use, which waits for a demon out, activates
+    /// the demon's aura, which multiplies the demon's damage done in every school while up.
+    BlackBook {
+        item_id: i32,
+        aura: String,
+        damage_multiplier: f64,
+    },
     /// The summoned demon's AI: the first ability it can cast while its mana stays above
     /// `min_mana`, otherwise a wait.
     WarlockPet {
@@ -5509,6 +5516,7 @@ impl Effect {
             Effect::AimedShot { .. } => "aimed_shot",
             Effect::ArcaneShot { .. } => "arcane_shot",
             Effect::RenatakisCharm { .. } => "renatakis_charm",
+            Effect::BlackBook { .. } => "black_book",
             Effect::HunterSetManaProc { .. } => "hunter_set_mana_proc",
             Effect::SniperShot { .. } => "sniper_shot",
             Effect::MultiShot { .. } => "multi_shot",
