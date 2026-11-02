@@ -135,8 +135,10 @@ jobs:
       - run: test "${{ needs.tests-go-golden-shard.result }}" = success
       # Free the storage once every shard has passed; after a failure the
       # artifact stays for a re-run of the failed shards. A fork's pull request
-      # gets a read-only token, so there the 1 day retention cleans it up.
+      # gets a read-only token, so there the step is skipped and the 1 day
+      # retention cleans it up.
       - name: Delete the classes-test artifact
+        if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
