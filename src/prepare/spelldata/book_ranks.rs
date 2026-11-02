@@ -56,6 +56,38 @@ pub(crate) const BOOK_RANKS: &[(i32, i32)] = &[
     (25362, 10441),
 ];
 
+/// The file `render_json` writes: what the app checks its player-facing data against, so a
+/// page cannot link or name a rank the sim no longer casts. A test fails while it is stale.
+pub(crate) const JSON_PATH: &str = "release/book-ranks.json";
+
+/// [`BOOK_RANKS`] as the JSON artifact at [`JSON_PATH`]: each book rank with the rank below and
+/// both ranks' names, in table order.
+pub(crate) fn render_json() -> String {
+    use crate::prepare::spelldata::store::must_find;
+    let ranks: Vec<serde_json::Value> = BOOK_RANKS
+        .iter()
+        .map(|&(book, below)| {
+            let (book_spell, below_spell) = (must_find(book), must_find(below));
+            serde_json::json!({
+                "book": book,
+                "below": below,
+                "name": book_spell.name,
+                "bookRank": book_spell.rank,
+                "belowRank": below_spell.rank,
+            })
+        })
+        .collect();
+    let file = serde_json::json!({
+        "note": "Ahn'Qiraj 20 book ranks the engine reads as the rank below under Forever's rules \
+                 (src/prepare/spelldata/book_ranks.rs). Generated: UPDATE_BOOK_RANKS=1 cargo test \
+                 --lib book_ranks.",
+        "ranks": ranks,
+    });
+    let mut out = serde_json::to_string_pretty(&file).expect("book ranks serialize");
+    out.push('\n');
+    out
+}
+
 /// Whether a spell is a book rank.
 pub(crate) fn is_book_rank(id: i32) -> bool {
     BOOK_RANKS.iter().any(|&(book, _)| book == id)
@@ -115,6 +147,21 @@ mod tests {
             assert_eq!(book.name, below.name, "{} and {}", book.id, below.id);
             assert!(below.spell_level <= book.spell_level);
         }
+    }
+
+    #[test]
+    fn the_book_ranks_artifact_is_current() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(JSON_PATH);
+        let want = render_json();
+        if std::env::var_os("UPDATE_BOOK_RANKS").is_some() {
+            std::fs::write(&path, &want).unwrap();
+        }
+        let have = std::fs::read_to_string(&path).unwrap_or_default();
+        assert!(
+            have == want,
+            "{JSON_PATH} is stale; regenerate it with UPDATE_BOOK_RANKS=1 cargo test --lib book_ranks \
+             and copy it into the app (scripts/sync-forever-book-ranks.mjs there)"
+        );
     }
 
     #[test]
