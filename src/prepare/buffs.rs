@@ -1,6 +1,7 @@
 //! Go sim/core/buffs (meta.go, amounts.go, drivers.go and the generated tables) and
 //! sim/core/buffs.go: the raid, party and individual buffs and the raid's debuffs.
 
+pub(crate) mod dark_inspiration;
 pub(crate) mod drivers;
 mod effects;
 pub(crate) mod flametongue;
@@ -57,6 +58,9 @@ pub(crate) struct Meta {
     pub talent: Option<(i32, i32)>,
     pub talent_effect: i32,
     pub talent_scales_duration: bool,
+    /// Go `TalentDivisor`: the buff is worth talent points / divisor of the row's amount, for a
+    /// talent its tooltip prices by rank; 0 for a talent priced by a spell modifier.
+    pub talent_divisor: i32,
     pub skip_auras: &'static [i32],
     pub full_combo_points: bool,
 }
@@ -75,6 +79,7 @@ impl Meta {
         talent: None,
         talent_effect: 0,
         talent_scales_duration: false,
+        talent_divisor: 0,
         skip_auras: &[],
         full_combo_points: false,
     };
@@ -95,7 +100,11 @@ impl Meta {
     /// Go `Meta.Options`.
     pub(crate) fn options(&self, talent_points: i32) -> ParseOptions {
         let mut options = ParseOptions::raid_buff(self.skip_auras, self.full_combo_points);
-        if !self.talent_scales_duration {
+        if self.talent_divisor > 0 {
+            if talent_points > 0 {
+                options.rank_fraction = f64::from(talent_points) / f64::from(self.talent_divisor);
+            }
+        } else if !self.talent_scales_duration {
             options.scale = self.talent_mod(talent_points);
         }
         options
@@ -399,9 +408,12 @@ pub(crate) fn apply_buff_effects(
         for removed in ["greater_blessing_of_salvation", "greater_blessing_of_light"] {
             individual.set_bool(removed, false);
         }
-        return apply_generated_buffs(env, unit, raid_buffs, party_buffs, &individual);
+        apply_generated_buffs(env, unit, raid_buffs, party_buffs, &individual)?;
+    } else {
+        apply_generated_buffs(env, unit, raid_buffs, party_buffs, individual)?;
     }
-    apply_generated_buffs(env, unit, raid_buffs, party_buffs, individual)
+    // After the generated party buffs, where wowsims/forever applies it.
+    dark_inspiration::apply_party_dark_inspiration(env, unit, party_buffs)
 }
 
 #[cfg(test)]
