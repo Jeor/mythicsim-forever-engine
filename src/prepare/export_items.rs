@@ -1997,18 +1997,9 @@ fn chance_on_hit_dot_shape(
     Some(shape)
 }
 
-/// Under Forever's rules: the chance on hit items `CHANCE_ON_HIT_ITEMS` registers
-/// (forever_items.rs), which the reference leaves unregistered. Each weapon or item proc rolls its
-/// manager's chance on the landed hits it hears, at the rate MythicSim assumes, and at once on the
-/// hit casts its damage spell, activates its buff (and its attack speed, where the buff changes
-/// it) or puts its armor debuff on the unit hit.
-fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>) -> Vec<Value> {
-    use super::shared_items::ProcKind;
-    let mut effects = Vec::new();
-    if env.sim.rules != super::sim::Rules::Forever {
-        return effects;
-    }
-    // The worn items, then with an item swap the swap set's, as item_effects.rs registers them.
+/// The worn items, then with an item swap the swap set's, once each, as item_effects.rs
+/// registers them.
+fn chance_on_hit_items(env: &Environment) -> Vec<i32> {
     let mut items: Vec<i32> = env
         .sim
         .character(env.player)
@@ -2021,10 +2012,62 @@ fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>
     }
     let mut seen = Vec::new();
     for item in items {
-        if item == 0 || seen.contains(&item) {
-            continue;
+        if item != 0 && !seen.contains(&item) {
+            seen.push(item);
         }
-        seen.push(item);
+    }
+    seen
+}
+
+/// Under Forever's rules, the buffs of the chance on hit items whose `stat_proc` effect
+/// [`chance_on_hit_item_effects`] describes and whose gain changes the wearer's stats, each read
+/// from a reset simulation of its own: Destiny's Strength, Quel'Serrar's Defense, Armor and
+/// Attack Power. The `stat_proc` effect only activates the aura, so its stats reach the runtime as
+/// a stat aura, and a tank's swing rolls follow its Defense and Armor.
+pub(crate) fn chance_on_hit_stat_auras(env: &Environment) -> Vec<String> {
+    use super::shared_items::ProcKind;
+    let mut labels = Vec::new();
+    if env.sim.rules != super::sim::Rules::Forever {
+        return labels;
+    }
+    for item in chance_on_hit_items(env) {
+        for (kind, cfg) in super::forever_items::chance_on_hit_registrations(item) {
+            if !matches!(kind, ProcKind::Proc | ProcKind::Aura) {
+                continue;
+            }
+            let label = spell_data_stat_proc_aura(cfg.name);
+            let described = aura_named(env, cfg.name)
+                .map(|trigger| env.sim.aura(trigger))
+                .is_some_and(|trigger| trigger.dpm.is_some() && trigger.icd.is_none())
+                && aura_named(env, &label).is_some_and(|aura| env.sim.aura(aura).max_stacks == 0);
+            if !described || labels.contains(&label) {
+                continue;
+            }
+            let mut fresh = env.fresh();
+            let player = fresh.player;
+            let aura = fresh.sim.get_aura(player, &label).expect("the aura exists");
+            let before = fresh.sim.unit(player).stats;
+            fresh.sim.activate(aura);
+            if fresh.sim.unit(player).stats != before {
+                labels.push(label);
+            }
+        }
+    }
+    labels
+}
+
+/// Under Forever's rules: the chance on hit items `CHANCE_ON_HIT_ITEMS` registers
+/// (forever_items.rs), which the reference leaves unregistered. Each weapon or item proc rolls its
+/// manager's chance on the landed hits it hears, at the rate MythicSim assumes, and at once on the
+/// hit casts its damage spell, activates its buff (and its attack speed, where the buff changes
+/// it) or puts its armor debuff on the unit hit.
+fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>) -> Vec<Value> {
+    use super::shared_items::ProcKind;
+    let mut effects = Vec::new();
+    if env.sim.rules != super::sim::Rules::Forever {
+        return effects;
+    }
+    for item in chance_on_hit_items(env) {
         for (kind, cfg) in super::forever_items::chance_on_hit_registrations(item) {
             let Some(trigger) = aura_named(env, cfg.name) else {
                 continue;

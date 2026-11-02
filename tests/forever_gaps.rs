@@ -12,7 +12,10 @@ use std::{fs, path::Path};
 mod paladin_113554;
 
 /// The paladin requests recorded with push 113554's talent tree.
-const RECORDED_IN_113554: &[&str] = &["retribution-paladin-swap-dark-iron-sunderer"];
+const RECORDED_IN_113554: &[&str] = &[
+    "retribution-paladin-swap-dark-iron-sunderer",
+    "protection-paladin-quel-serrar",
+];
 
 fn request(name: &str) -> Value {
     let path = Path::new(concat!(
@@ -924,4 +927,64 @@ fn a_rogues_own_cooldowns_cast_at_the_player() {
     for spell in [1856, 13750, 13877] {
         assert!(action(&player, spell, 0).0 >= 50.0, "spell {spell}");
     }
+}
+
+/// The stat aura combination with only `label` up, and the one with no aura up.
+fn alone_and_base<'a>(prepared: &'a Value, label: &str) -> (usize, &'a Value, &'a Value) {
+    let stat_auras = effects(prepared, "stat_auras");
+    assert_eq!(stat_auras.len(), 1);
+    let auras = stat_auras[0]["auras"].as_array().unwrap();
+    let bit = auras
+        .iter()
+        .position(|aura| aura == label)
+        .unwrap_or_else(|| panic!("{label} is no stat aura: {auras:?}"));
+    let combos = &stat_auras[0]["combos"];
+    (bit, &combos[1 << bit], &combos[0])
+}
+
+/// Quel'Serrar on a Protection Paladin tank (production sims 0f6efd63, 338079ed, eadd22f1 and
+/// 1524d32a, 1 November 2026): its Sanctuary (22850) grants 13 Defense, 300 Armor and 30 Attack
+/// Power, and its Defense and Armor change the target's swings, which the gate refused. The buff
+/// is now a stat aura, so the swing rolls are read with it up: 13 Defense moves the miss, dodge,
+/// parry and block chances up and the crit chance down by 0.52% each, and the Armor lowers the
+/// armor multiplier.
+#[test]
+fn quel_serrars_sanctuary_changes_the_targets_swings() {
+    let (value, player) = run("protection-paladin-quel-serrar");
+    let (bit, alone, base) = alone_and_base(&value, "Quel'Serrar Proc");
+    let power = |combo: &Value| combo["AttackPower"].as_f64().unwrap();
+    assert_eq!(power(alone) - power(base), 30.0);
+    let rolls = value["enemy"]["rolls"].as_array().unwrap();
+    let (up, down) = (&rolls[1 << bit], &rolls[0]);
+    for (step, sign) in [
+        ("miss_chance", 1.0),
+        ("dodge_chance", 1.0),
+        ("parry_chance", 1.0),
+        ("block_chance", 1.0),
+        ("crit_chance", -1.0),
+    ] {
+        let moved = up[step].as_f64().unwrap() - down[step].as_f64().unwrap();
+        assert!((moved - sign * 0.0052).abs() < 1e-9, "{step} moved {moved}");
+    }
+    assert!(up["armor_multiplier"].as_f64().unwrap() < down["armor_multiplier"].as_f64().unwrap());
+    assert!(aura_uptime(&player, 22850) > 0.0);
+}
+
+/// Destiny (647) on a Warrior who does not tank: the chance on hit's buff (17152, Strength 200)
+/// was activated but read as no stat aura, so its Strength never reached the runtime. It is now
+/// one, as Quel'Serrar's is, without the Defense, which only the target's swings at a tank read.
+#[test]
+fn destinys_strength_reaches_the_runtime() {
+    let value = edited(
+        "dps-warrior-mark-of-the-champion-undead",
+        &[(r#""id":235480"#, r#""id":647"#)],
+    );
+    let prepared = prepare_json_with(value.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    let (_, alone, base) = alone_and_base(&prepared, "Destiny Proc");
+    assert!(
+        alone["AttackPower"].as_f64().unwrap() > base["AttackPower"].as_f64().unwrap(),
+        "{alone} {base}"
+    );
+    let player = run_prepared(&prepared)["raidMetrics"]["parties"][0]["players"][0].clone();
+    assert!(aura_uptime(&player, 17152) > 0.0);
 }

@@ -521,7 +521,14 @@ the Go goldens and exporter uses. The departures:
   where it is magic and its ticks deal their amount, one around the wielder goes on every target,
   and one a missile carries goes on as the hit lands, its flight not modelled.
   `docs/forever-chance-on-hit.md` lists the items by kind and those left out with the reason
-  (crowd control, threat, mana, heals, debuffs only a tank feels).
+  (crowd control, threat, mana, heals, debuffs only a tank feels). A wearer buff that changes
+  stats (Destiny's Strength, Quel'Serrar's Armor and Attack Power, Ragehammer's Attack Power) is
+  a stat aura, so its stats reach the runtime and a tank's swing rolls are read with it up
+  (`chance_on_hit_stat_auras`, `src/prepare/export_items.rs`). Quel'Serrar's Sanctuary (22850)
+  also grants 13 Defense (`A_MOD_SKILL` of skill line 95), which the effect parser leaves out;
+  it is added while the wearer tanks the target, whose swings read it, and left out otherwise,
+  where only a Goblin Sapper Charge's hit on its thrower would read it
+  (`src/prepare/forever_items.rs`). The 36 Attack Power against Dragonkin is not modelled.
 - Forever's Engineering ammo, from the Wowhead Forever tooltips: Swiftfeather Arrow (274387) and
   Swiftstrike Shot (274388), item level 65 and requiring level 60, each "Adds 24.5 damage per
   second". The reference's ammo stops at Miniature Cannon Balls, so the request schema adds them

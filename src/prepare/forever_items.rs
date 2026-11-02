@@ -82,10 +82,50 @@ fn apply_chance_on_hit_item(env: &mut Environment, item: i32) -> bool {
     for (kind, cfg) in chance_on_hit_registrations(item) {
         if shared_items::registers(kind, &cfg) {
             shared_items::apply(env, kind, &cfg);
+            if matches!(kind, ProcKind::Proc | ProcKind::Aura) {
+                chance_on_hit_defense(env, &cfg);
+            }
             return true;
         }
     }
     false
+}
+
+/// The client's Defense skill aura (`A_MOD_SKILL` of skill line 95), which the effect parser
+/// leaves out as the reference's does.
+const SKILL_LINE_DEFENSE: i32 = 95;
+
+/// A chance on hit buff's Defense skill, which the parsed aura leaves out: Quel'Serrar's Sanctuary
+/// (22850) grants 13 Defense beside its Armor and Attack Power. A point of Defense skill is
+/// `DEFENSE_RATING_PER_DEFENSE_LEVEL` of the Defense stat, as the item sets' Defense bonuses add it.
+/// It is added only while the wearer tanks the target, whose swings read it; otherwise only a
+/// Goblin Sapper Charge's hit on its thrower would, whose crit taken the runtime holds fixed.
+fn chance_on_hit_defense(env: &mut Environment, cfg: &SpellDataProc) {
+    use super::character::constants::DEFENSE_RATING_PER_DEFENSE_LEVEL;
+    if !env.tanking() {
+        return;
+    }
+    let (_, row) = cfg.rows();
+    let level = env.sim.unit(env.player).level;
+    let defense: f64 = row
+        .effects
+        .iter()
+        .filter(|effect| {
+            effect.aura == super::dbcenums::A_MOD_SKILL && effect.misc == SKILL_LINE_DEFENSE
+        })
+        .map(|effect| effect.average(level))
+        .sum();
+    let label = format!("{} Proc", cfg.name);
+    let Some(aura) = env.sim.get_aura(env.player, &label) else {
+        return;
+    };
+    if defense != 0.0 {
+        env.sim.attach_stat_buff(
+            aura,
+            Stat::DefenseRating,
+            defense * DEFENSE_RATING_PER_DEFENSE_LEVEL,
+        );
+    }
 }
 
 /// The Forever chance on hit registrations of an item, expanded to its variant.
