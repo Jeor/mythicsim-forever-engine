@@ -464,6 +464,30 @@ impl<A: Agent> Fight<A> {
         self.autos.min_time = self.autos.min_time.min(earliest);
     }
 
+    /// Forever's rule for using an item while swinging (Oil of Immolation): each of the player's
+    /// melee hands that is swinging, with its swing not yet due, comes `delay` later. A hand
+    /// that is not swinging (out of range, or before the pull) has no timer running and loses
+    /// nothing, and the ranged auto is left alone.
+    pub(crate) fn delay_running_melee_swings(&mut self, delay: i64) {
+        if delay <= 0 || !self.autos.melee {
+            return;
+        }
+        let now = self.now;
+        let hands: &[Hand] = if self.autos.dual_wielding {
+            &[Hand::Main, Hand::Off]
+        } else {
+            &[Hand::Main]
+        };
+        // The list's next time stays at the older, earlier one: the swing it wakes for finds
+        // itself not due and reports its new time, as with a swing the weapon sync delays.
+        for &hand in hands {
+            let attack = self.autos.attack(hand);
+            if attack.enabled && attack.swing_at > now {
+                attack.swing_at += delay;
+            }
+        }
+    }
+
     /// Go `AutoAttacks.startPull` for the targets, whose swings are added in unit index order
     /// before the player's.
     pub(crate) fn start_enemy_attacks(&mut self) {

@@ -5694,8 +5694,14 @@ impl<A: Agent> Fight<A> {
         self.reset();
         // Go PrePull: time starts at the first prepull action; later ones run first at a tie.
         let count = self.prepull.len() as i32;
-        if let Some(&(first, _)) = self.prepull.first() {
-            self.now = first;
+        // Forever's Oil of Immolation rule: the oil is used before the pull, even with no prepull.
+        let start = match (self.prepull.first(), self.oil_of_immolation_start()) {
+            (Some(&(first, _)), Some(oil)) => Some(first.min(oil)),
+            (Some(&(first, _)), None) => Some(first),
+            (None, oil) => oil,
+        };
+        if let Some(start) = start {
+            self.now = start;
         }
         for index in 0..self.prepull.len() {
             let (at, act) = self.prepull[index];
