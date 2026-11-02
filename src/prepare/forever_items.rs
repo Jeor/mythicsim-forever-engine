@@ -98,13 +98,10 @@ const SKILL_LINE_DEFENSE: i32 = 95;
 /// A chance on hit buff's Defense skill, which the parsed aura leaves out: Quel'Serrar's Sanctuary
 /// (22850) grants 13 Defense beside its Armor and Attack Power. A point of Defense skill is
 /// `DEFENSE_RATING_PER_DEFENSE_LEVEL` of the Defense stat, as the item sets' Defense bonuses add it.
-/// It is added only while the wearer tanks the target, whose swings read it; otherwise only a
-/// Goblin Sapper Charge's hit on its thrower would, whose crit taken the runtime holds fixed.
+/// The target's swings at a tank read it through the swing rolls, and a Goblin Sapper Charge's
+/// hit on its thrower through the crit taken the stat aura combinations carry.
 fn chance_on_hit_defense(env: &mut Environment, cfg: &SpellDataProc) {
     use super::character::constants::DEFENSE_RATING_PER_DEFENSE_LEVEL;
-    if !env.tanking() {
-        return;
-    }
     let (_, row) = cfg.rows();
     let level = env.sim.unit(env.player).level;
     let defense: f64 = row

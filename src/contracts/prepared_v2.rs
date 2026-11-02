@@ -2880,6 +2880,11 @@ pub enum Effect {
         attack_power: f64,
         ranged_attack_power: f64,
         spell_damage: f64,
+        /// Under Forever's rules, melee attack power against the targets' type alone
+        /// (`A_MOD_MELEE_ATTACK_POWER_VERSUS`), as Quel'Serrar's Sanctuary grants against
+        /// Dragonkin; ranged attacks do not read it.
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        melee_attack_power: f64,
     },
     /// core/enchant_speed.go `registerSpeedAura` (Forever's rules, with an item swap): an item
     /// or enchant's speed aura multiplies the melee, ranged and cast speed while up. The one

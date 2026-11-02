@@ -75,3 +75,4 @@ checks the gate passes and runs it.
 | `combat-rogue-self-casts-at-player` | a strict sequence casting Vanish, Adrenaline Rush and Blade Flurry at the player (1 November 2026) |
 | `protection-paladin-quel-serrar` | Quel'Serrar on a Protection Paladin tank, whose Sanctuary's Defense and Armor change the target's swings (1 November 2026; its talents are in push 113554's tree already) |
 | `demonology-warlock-black-book` | The Black Book on a Demonology Warlock with the Imp out, whose use had no exported effect (1 November 2026) |
+| `enhancement-shaman-fifteen-stat-aura-bits` | an Orc Enhancement Shaman with Jom Gabbar, whose stat auras take 15 bits, past the reference's 14 (1 November 2026) |

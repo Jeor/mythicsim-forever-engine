@@ -2056,6 +2056,47 @@ pub(crate) fn chance_on_hit_stat_auras(env: &Environment) -> Vec<String> {
     labels
 }
 
+/// The client's creature types (`CreatureType`), by the bit a creature type mask gives each,
+/// as the request names them.
+const CREATURE_TYPES: [(i32, &str); 9] = [
+    (1, "MobTypeBeast"),
+    (2, "MobTypeDragonkin"),
+    (3, "MobTypeDemon"),
+    (4, "MobTypeElemental"),
+    (5, "MobTypeGiant"),
+    (6, "MobTypeUndead"),
+    (7, "MobTypeHumanoid"),
+    (8, "MobTypeCritter"),
+    (9, "MobTypeMechanical"),
+];
+
+/// A chance on hit buff's melee attack power against creature types
+/// (`A_MOD_MELEE_ATTACK_POWER_VERSUS`, its mask in the misc value), which the parsed aura leaves
+/// out: Quel'Serrar's Sanctuary grants 36 against Dragonkin (22850, mask 2). It holds when every
+/// target is of a type the mask names, as a fight's targets are of one type.
+fn melee_power_versus_targets(env: &Environment, row: &Spell) -> Option<f64> {
+    let named = |mask: i32, target: UnitId| {
+        let mob_type = env.sim.unit(target).mob_type.as_str();
+        CREATURE_TYPES
+            .iter()
+            .any(|(id, name)| mask & (1 << (id - 1)) != 0 && *name == mob_type)
+    };
+    let power: f64 = row
+        .effects
+        .iter()
+        .filter(|effect| {
+            effect.aura == dbcenums::A_MOD_MELEE_ATTACK_POWER_VERSUS
+                && env
+                    .encounter
+                    .targets
+                    .iter()
+                    .all(|&target| named(effect.misc, target))
+        })
+        .map(|effect| effect.average(env.sim.unit(env.player).level))
+        .sum();
+    (power != 0.0).then_some(power)
+}
+
 /// Under Forever's rules: the chance on hit items `CHANCE_ON_HIT_ITEMS` registers
 /// (forever_items.rs), which the reference leaves unregistered. Each weapon or item proc rolls its
 /// manager's chance on the landed hits it hears, at the rate MythicSim assumes, and at once on the
@@ -2125,6 +2166,13 @@ fn chance_on_hit_item_effects(env: &Environment, unrepresented: &mut Vec<String>
                         "kind": "stat_proc", "trigger_aura": trigger.label,
                         "rng_label": trigger.label, "aura": aura.label, "chances": chances,
                     }));
+                    if let Some(power) = melee_power_versus_targets(env, row) {
+                        effects.push(json!({
+                            "kind": "mob_type_bonus", "aura": aura.label, "attack_power": 0.0,
+                            "ranged_attack_power": 0.0, "spell_damage": 0.0,
+                            "melee_attack_power": power,
+                        }));
+                    }
                     let melee: f64 = row
                         .effects
                         .iter()

@@ -1036,3 +1036,61 @@ fn the_black_book_doubles_the_demons_damage() {
         "{refused:?}"
     );
 }
+
+/// Quel'Serrar on a Warrior who does not tank and throws Goblin Sapper Charges, against
+/// Dragonkin: the Sanctuary's 13 Defense lowers the crit the sapper's hit on its thrower takes by
+/// 0.52%, which the stat aura combinations carry, and its 36 melee attack power against Dragonkin
+/// (22850, aura 102 of mask 2) holds while it is up. Against Undead the bonus is not exported.
+#[test]
+fn quel_serrar_off_a_tank_against_dragonkin() {
+    let quel_serrar = (r#""id":235480"#, r#""id":18348"#);
+    let dragonkin = (
+        r#""mobType":"MobTypeUndead""#,
+        r#""mobType":"MobTypeDragonkin""#,
+    );
+    let value = edited(
+        "dps-warrior-mark-of-the-champion-undead",
+        &[quel_serrar, dragonkin],
+    );
+    let prepared = prepare_json_with(value.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    assert_eq!(effects(&prepared, "goblin_sapper").len(), 1);
+    let (_, alone, base) = alone_and_base(&prepared, "Quel'Serrar Proc");
+    let taken = |combo: &Value| combo["PseudoReducedCritTakenPercent"].as_f64().unwrap();
+    assert!(
+        (taken(alone) - taken(base) - 0.0052).abs() < 1e-12,
+        "{alone} {base}"
+    );
+    let bonuses = effects(&prepared, "mob_type_bonus");
+    let bonus = bonuses
+        .iter()
+        .find(|effect| effect["aura"] == "Quel'Serrar Proc")
+        .unwrap_or_else(|| panic!("{bonuses:?}"));
+    assert_eq!(bonus["melee_attack_power"], json!(36.0));
+    assert_eq!(bonus["ranged_attack_power"], json!(0.0));
+    run_prepared(&prepared);
+    let undead = edited("dps-warrior-mark-of-the-champion-undead", &[quel_serrar]);
+    let undead = prepare_json_with(undead.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    assert!(effects(&undead, "mob_type_bonus")
+        .iter()
+        .all(|effect| effect["aura"] != "Quel'Serrar Proc"));
+}
+
+/// An Orc Enhancement Shaman with Jom Gabbar (production sim ff415e0d, 1 November 2026): the
+/// totems, the swap, the imbues and the potion take 10 stat aura bits, Blood Fury one and Jom
+/// Gabbar's stacks four, 15 in all, past the reference's 14. Forever's rules combine up to 16.
+#[test]
+fn fifteen_stat_aura_bits_run() {
+    let (value, _) = run("enhancement-shaman-fifteen-stat-aura-bits");
+    let stat_auras = effects(&value, "stat_auras");
+    let auras = stat_auras[0]["auras"].as_array().unwrap();
+    for label in ["Blood Fury", "Jom Gabbar"] {
+        assert!(auras.contains(&json!(label)), "{auras:?}");
+    }
+    assert_eq!(stat_auras[0]["combos"].as_array().unwrap().len(), 1 << 15);
+    let reference = request("enhancement-shaman-fifteen-stat-aura-bits").to_string();
+    let refused = prepare_json_with(reference.as_bytes(), "rust", Rules::GoReference).unwrap_err();
+    assert!(
+        format!("{refused:?}").contains("exceed the combination limit"),
+        "{refused:?}"
+    );
+}

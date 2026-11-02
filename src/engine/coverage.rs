@@ -1525,10 +1525,17 @@ fn fixed_stat_aura_changes(prepared: &PreparedV2) -> Vec<String> {
         matches!(effect, Effect::ItemSwap { swapped, .. }
             if swapped.iter().any(|change| change.path == "/player/pseudo_stats/reduced_crit_taken_percent"))
     });
+    // Under Forever's rules the combinations carry the crit the player takes when one changes
+    // it, which the runtime sets on the Goblin Sapper Charge's hit on its thrower.
+    let crit_taken_carried = prepared.effects.iter().any(|effect| {
+        matches!(effect, Effect::StatAuras { combos, .. }
+            if combos.iter().all(|combo| combo.contains_key("PseudoReducedCritTakenPercent")))
+    });
     let inert = move |stat: &str| {
         defense_followed
             && (stat == "DefenseRating"
-                || (stat == "ReducedCritTakenPercent" && (!sapper || swap_sets_crit_taken)))
+                || (stat == "ReducedCritTakenPercent"
+                    && (!sapper || swap_sets_crit_taken || crit_taken_carried)))
     };
     prepared
         .effects
