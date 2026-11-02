@@ -2852,9 +2852,12 @@ pub enum Effect {
         metrics_action_id: ActionId,
     },
     /// Oil of Immolation (MythicSim Rust only, client 70707 item 8956): the character uses the oil
-    /// at the pull and again as its `aura` ends, and each of the aura's `ticks` periods casts the
-    /// tick `spell` (a Fire hit of `damage` on every target) if the player stands within
-    /// `radius` yards.
+    /// `prepot_ns` before the pull and again as its `aura` ends, and each of the aura's `ticks`
+    /// periods casts the tick `spell` (a Fire hit of `damage` on every target) if the player
+    /// stands within `radius` yards. A use while the player's melee swings are running pushes
+    /// each pending swing back by `swing_delay_ns`; the use before the pull finds none running.
+    /// A prepared value without the two durations (an older one) uses the oil at the pull and
+    /// delays nothing.
     OilOfImmolation {
         item_id: i32,
         aura: String,
@@ -2863,6 +2866,10 @@ pub enum Effect {
         ticks: i32,
         radius: f64,
         damage: f64,
+        #[serde(default)]
+        swing_delay_ns: i64,
+        #[serde(default)]
+        prepot_ns: i64,
     },
     /// core/battle_squawk.go (Forever's rules): the party's squawks, up from the reset in the
     /// exported melee state, take their melee speed back as their stacks fall to none at the

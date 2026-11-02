@@ -1,6 +1,7 @@
 //! Oil of Immolation, a MythicSim Rust-only consumable beyond the Go reference pin (client
-//! 1.60.1.70707): the request's `oilOfImmolation` flag has the character use item 8956 so that
-//! its Fire Shield is up from the pull and again each time it ends.
+//! 1.60.1.70707): the request's `oilOfImmolation` flag has the character use item 8956 half a
+//! second before the pull, so that its Fire Shield is up from the pull, and again each time it
+//! ends.
 //!
 //! The pinned game data (`data/spells.jsonl`) holds neither spell row, so the values below are
 //! the client's, restated as literals the way Go restates the Goblin Sapper's:
@@ -11,6 +12,10 @@
 //!   is not the potion category, so it shares nothing with the potions.
 //! - Spell 11351 "Fire Shield" is a Fire school school damage effect of 50 base points (a flat
 //!   50, no spell power coefficient) on every enemy within its radius of the caster.
+//!
+//! The two durations below are not client rows but the players' report (Bae, a Classic player on
+//! the project's Discord): using the oil while a swing timer is running stalls the auto attack
+//! swing for 0.5 s, so players use it 0.5 s before the pull, where no swing is running yet.
 
 use serde_json::{json, Value};
 
@@ -35,6 +40,12 @@ const DURATION: Duration = 15 * SECOND;
 const PERIOD: Duration = 3 * SECOND;
 /// The tick's flat Fire damage: spell 11351's base points.
 const DAMAGE: f64 = 50.0;
+/// How far a use pushes back each running melee swing: "0.5 sec swingtime stunt when using it
+/// during swings".
+const SWING_DELAY: Duration = SECOND / 2;
+/// How long before the pull the first use happens, so that it costs no swing time: the same half
+/// second.
+const PREPOT: Duration = SECOND / 2;
 /// The tick's radius in yards around the user: the radius of spell 11351's area effect.
 const RADIUS: f64 = 5.0;
 
@@ -74,5 +85,6 @@ pub(crate) fn oil_of_immolation_effect(env: &Environment) -> Option<Value> {
     Some(json!({
         "kind": "oil_of_immolation", "item_id": ITEM, "aura": AURA, "spell": spell,
         "period_ns": PERIOD, "ticks": DURATION / PERIOD, "radius": RADIUS, "damage": DAMAGE,
+        "swing_delay_ns": SWING_DELAY, "prepot_ns": PREPOT,
     }))
 }

@@ -570,11 +570,20 @@ the Go goldens and exporter uses. The departures:
   restates them as literals. A request opts in with `consumables.oilOfImmolation: true`, a
   Rust-only boolean of the consumables message (`FOREVER_BOOL_FIELDS` in
   `src/contracts/request/schema.rs`, field 1000; the Go reference refuses it as an unknown
-  field). The character uses the oil at 0 s, so the shield is up at the pull, and again each time
-  the shield ends, all fight. Every 3 seconds, the fifth on the moment the shield ends, spell
-  11351 deals its 50 as a magic hit with a crit to every target, rolled for each target in turn,
-  and shows in the actions as spell 11351; the shield's uptime shows as aura 11350 ("Oil of
-  Immolation"). The fight models one distance between the player and the targets
+  field). The character uses the oil 0.5 s before the pull, so the shield is up at the pull, and
+  again each time the shield ends, all fight. Every 3 seconds from each use (the first tick 2.5 s
+  into the fight), the fifth on the moment the shield ends, spell 11351 deals its 50 as a magic
+  hit with a crit to every target, rolled for each target in turn, and shows in the actions as
+  spell 11351; the shield's uptime shows as aura 11350 ("Oil of Immolation"). The client rows
+  have no tick at the moment of the use (no `START_PERIODIC_AT_APPLY` on spell 11350), so a use
+  loses no tick. Using the oil while a swing timer is running stalls the auto attack for 0.5 s,
+  which is why players use it before the pull, where none is running (a report from Bae, a
+  Classic player on the project's Discord, not a client row: "0.5 sec swingtime stunt when using
+  it during swings"). Each use in combat therefore pushes the player's running melee swings, the
+  main hand and a dual wielder's off hand, back by 0.5 s (`swing_delay_ns` on the effect); a hand
+  that is not swinging (out of melee range, or before the pull) loses nothing and the ranged auto
+  is not delayed. Bae also said a prepot "loses 1 of the 5 ticks"; with the client's timing a use
+  at -0.5 s loses none, so the rules do not drop one. The fight models one distance between the player and the targets
   (`distanceFromTarget`), so the tick reaches all of the targets or none: a character beyond 5
   yards, such as a ranged character at range, takes none. Nothing changes without the field
   (the prepared effect is `oil_of_immolation`, `src/core/fight/oil_of_immolation.rs`,
