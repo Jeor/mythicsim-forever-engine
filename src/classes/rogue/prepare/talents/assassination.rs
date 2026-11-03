@@ -17,7 +17,8 @@ use super::super::masks;
 use super::super::spell_data::spell_data;
 use super::super::spells::{BUILDER, FINISHER};
 use super::super::util::{
-    energy_cost, ignore_haste_cast, longest_cooldown, spell_action, tagged_action,
+    energy_cost, ignore_haste_cast, longest_cooldown, mutilate_weapon_share, spell_action,
+    tagged_action,
 };
 use super::super::{Rogue, SLICE_AND_DICE_DURATIONS};
 
@@ -386,9 +387,9 @@ impl Rogue {
                     proc_mask,
                     flags: SpellFlag::MELEE_METRICS | BUILDER,
                     class_spell_mask: masks::MUTILATE_HIT,
-                    // Every hit rank states the same 75% weapon share.
-                    damage_multiplier: spell_data().mutilate_triggered.effect_at(2).value_at(1)
-                        / 100.0,
+                    // Every hit rank states the same weapon share: 75%, or 90% under Forever's
+                    // rules since the notes of 2 November 2026.
+                    damage_multiplier: mutilate_weapon_share(sim.rules),
                     damage_multiplier_additive: 1.0,
                     threat_multiplier: 1.0,
                     ..SpellConfig::default()

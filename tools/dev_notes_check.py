@@ -47,6 +47,16 @@ ROWS = [
     ("Wrack spell power coefficient", 1316697, 1349556, "SPCoef", 0.286, 0.143),
     ("Stormstrike cooldown (ms)", 17364, None, "CooldownMs", 6000, 8000),
     ("Improved Slam cooldown cut (ms), rank 2", 12862, 1339521, "BasePoints", -5000, -3000),
+    ("Flawless Execution Energy", 1310711, 1340441, "BasePoints", -15, -10),
+    ("Mutilate rank 4 main hand weapon %", 1241586, 1240654, "BasePoints", 90, 75),
+    ("Mutilate rank 4 off hand weapon %", 1241590, 1240661, "BasePoints", 90, 75),
+    ("Mutilate rank 1 weapon %", 1310705, 1340423, "BasePoints", 90, 75),
+]
+
+# (label, spell id, effect id, class flag bit, whether Forever's rules have it set)
+CLASS_FLAGS = [
+    ("Hemorrhage's debuff covers Garrote", 16511, 693309, 256, True),
+    ("Aggression leaves Backstab out", 18427, 695769, 4, False),
 ]
 
 # (label, talent spell id, curve row, Forever's values, frozen values)
@@ -58,10 +68,19 @@ TALENTS = [
     ("Lightning Overload", 408438, 0, [10, 20, 30], [3, 7, 10]),
     ("Mental Dexterity", 415140, 0, [50, 100, 150], [33, 67, 100]),
     ("Flurry (Shaman)", 16256, 0, [6, 12, 18, 24, 30], [5, 10, 15, 20, 25]),
+    ("Aggression", 18427, 0, [5, 10, 15], [2, 4, 6]),
     ("Rend and Tear", 1223246, 0, [3, 6, 9, 12, 15], [2, 4, 6, 8, 10]),
 ]
 
 NOT_IN_DATA = [
+    ("Instant Poison 1% and Deadly Poison 0.9% a tick of attack power",
+     "poison hits at two attack power values: each grows 0.01 and 0.009 a point (a stack for Deadly)"),
+    ("Efficient Strikes takes Energy off Hemorrhage too",
+     "Hemorrhage's cost with the talent: 35 less 3 or 5 (the talent's class flags state it once "
+     "the client does)"),
+    ("Shank (level 24, 5 Energy, 10 sec, 50% weapon damage, 15 or 25 Energy) and Poised",
+     "no client row yet: Forever's rules use the provisional ids 1399001 and 1399002; replace "
+     "them once a client build carries the spells"),
     ("Arcane Shot 15% of ranged attack power",
      "Arcane Shot on a training dummy at two ranged attack power values: the damage grows 0.15 a point"),
     ("Serpent Sting 5% of ranged attack power a tick",
@@ -137,6 +156,13 @@ def check(path):
         state = verdict(value, forever, frozen)
         differs += state == "DIFFERS"
         print(f"  {state:8} {label}: store {value}, Forever {forever:g}, frozen {frozen:g}")
+    for label, spell, effect_id, bit, forever in CLASS_FLAGS:
+        mask = None
+        for effect in store["Effects"].get(str(spell), []):
+            if effect["ID"] == effect_id:
+                mask = effect["ClassFlags"]["Mask"][0]
+        state = "missing" if mask is None else "live" if bool(mask & bit) == forever else "old"
+        print(f"  {state:8} {label}: store mask {mask}, bit {bit}")
     for label, spell, row, forever, frozen in TALENTS:
         values = talent_curve(store, spell, row)
         state = curve_verdict(values, forever, frozen)

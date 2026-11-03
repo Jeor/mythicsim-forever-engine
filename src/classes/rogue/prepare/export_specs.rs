@@ -10,14 +10,15 @@ use crate::prepare::common_effects::SPELL_BATCH_WINDOW;
 use crate::prepare::consumable_effects::proc_trigger_spells;
 use crate::prepare::dbcenums;
 use crate::prepare::env::Environment;
-use crate::prepare::sim::SECOND;
+use crate::prepare::sim::{Rules, SECOND};
 use crate::prepare::spell::{DefenseType, ProcMask};
 
 use super::export::{action, mask_names, poison_bonus};
 use super::poisons::{poison_proc_mask, IMBUES};
 use super::spell_data::spell_data;
 use super::spells::BUILDER;
-use super::util::{has_dagger, proc_mask_for_types, spell_action, Hand};
+use super::spells::{POISED_COST_REDUCTION, SHANK_ENERGY_GAIN};
+use super::util::{has_dagger, mutilate_weapon_share, proc_mask_for_types, spell_action, Hand};
 use super::{masks, Rogue, SLICE_AND_DICE_DURATIONS};
 
 /// talents_assassination.go `mutilateFlatDamage`, keyed on the parent rank.
@@ -98,12 +99,12 @@ impl Rogue {
         // rupture.go: the tick and its step a combo point, the attack power share a point, a Go
         // literal, and the multiplier Hemorrhage's debuff gives the rogue's Rupture ticks while
         // it is up, read from the damage taken from caster effect of the client row
-        // (talents_subtlety.go).
+        // (talents_subtlety.go). Under Forever's rules it gives Garrote's ticks the same.
         if self.spells.rupture.is_some() {
             let row = data.rupture.highest();
             let tick = row.periodic_effect();
             let hemorrhage = target_aura_label(&self.auras.hemorrhage).unwrap_or_default();
-            effects.push(json!({
+            let mut rupture = json!({
                 "kind": "rupture", "spell_id": row.id, "tick_damage": tick.average(level),
                 "damage_per_combo_point": f64::from(tick.points_per_resource),
                 "base_tick_count": (row.duration() / tick.period()) as i32,
@@ -115,7 +116,12 @@ impl Rogue {
                     + data.hemorrhage.highest()
                         .effect(dbcenums::A_MOD_SPELL_DAMAGE_FROM_CASTER, 0)
                         .percent(),
-            }));
+            });
+            // The notes of 2 November 2026 extend Hemorrhage's debuff to the rogue's Garrote.
+            if env.rules == Rules::Forever {
+                rupture["hemorrhage_garrote"] = json!(true);
+            }
+            effects.push(rupture);
         }
         // talents_assassination.go registerMutilate: two combo points, then the off hand and
         // main hand hits, each harder while a lingering poison is on the target.
@@ -126,7 +132,7 @@ impl Rogue {
                 "poison_bonus": row.effect_n(4).average(level) / 100.0,
                 "combo_points": row.energize_effect().average(level) as i32,
                 "daggers": has_dagger(sim, player, Hand::Main) && has_dagger(sim, player, Hand::Off),
-                "weapon_share": data.mutilate_triggered.effect_at(2).value_at(1) / 100.0,
+                "weapon_share": mutilate_weapon_share(env.rules),
             }));
         }
         // talents_assassination.go registerColdBlood: a crit bonus on the masked spells until
@@ -336,6 +342,22 @@ impl Rogue {
                 "damage_taken_multiplier": 1.0
                     + data.improved_kidney_shot.value_at(talents.i32("improved_kidney_shot")) / 100.0,
                 "target_tanks_player": env.tanking(),
+            }));
+        }
+        // The notes of 2 November 2026 (Forever's rules): Shank, an off hand strike for 50% weapon
+        // damage that generates Energy, and Poised, which takes 10 Energy off the first Energy
+        // ability of the fight.
+        if let Some(spell) = self.spells.shank {
+            effects.push(json!({
+                "kind": "shank", "spell_id": sim.spell(spell).action_id.spell_id,
+                "energy_gain": SHANK_ENERGY_GAIN,
+            }));
+        }
+        if let Some(aura) = self.auras.poised {
+            effects.push(json!({
+                "kind": "poised", "aura": sim.aura(aura).label,
+                "cost_reduction": POISED_COST_REDUCTION,
+                "class_spells": mask_names(masks::ENERGY_ABILITIES),
             }));
         }
         effects.extend(self.expose_armor_effects(env, unrepresented));

@@ -8,7 +8,6 @@ use crate::prepare::spelldata::Ladder;
 /// Go `generatedSpellData`, for the ladders `sim/rogue` and its exporter use.
 pub(super) struct SpellData {
     pub adrenaline_rush: Ladder,
-    pub aggression: Ladder,
     pub ambush: Ladder,
     pub backstab: Ladder,
     pub blade_flurry: Ladder,
@@ -21,7 +20,6 @@ pub(super) struct SpellData {
     pub elusiveness: Ladder,
     pub eviscerate: Ladder,
     pub expose_armor: Ladder,
-    pub flawless_execution: Ladder,
     pub garrote: Ladder,
     pub ghostly_strike: Ladder,
     pub hack_and_slash: Ladder,
@@ -41,7 +39,6 @@ pub(super) struct SpellData {
     pub malice: Ladder,
     pub murder: Ladder,
     pub mutilate: Ladder,
-    pub mutilate_triggered: Ladder,
     pub opportunity: Ladder,
     pub precision: Ladder,
     pub premeditation: Ladder,
@@ -71,7 +68,6 @@ pub(super) fn spell_data() -> &'static SpellData {
     static DATA: OnceLock<SpellData> = OnceLock::new();
     DATA.get_or_init(|| SpellData {
         adrenaline_rush: Ladder::ranked(&[13750]),
-        aggression: Ladder::talent(18427, 3),
         ambush: Ladder::ranked(&[8676, 8724, 8725, 11267, 11268, 11269]),
         backstab: Ladder::ranked(&[53, 2589, 2590, 2591, 8721, 11279, 11280, 11281, 25300]),
         blade_flurry: Ladder::ranked(&[13877]),
@@ -84,7 +80,6 @@ pub(super) fn spell_data() -> &'static SpellData {
         elusiveness: Ladder::talent(13981, 2),
         eviscerate: Ladder::ranked(&[2098, 6760, 6761, 6762, 8623, 8624, 11299, 11300, 31016]),
         expose_armor: Ladder::ranked(&[8647, 8649, 8650, 11197, 11198]),
-        flawless_execution: Ladder::ranked(&[1310711]),
         garrote: Ladder::ranked(&[703, 8631, 8632, 8633, 11289, 11290]),
         ghostly_strike: Ladder::ranked(&[14278]),
         hack_and_slash: Ladder::talent(13960, 5),
@@ -104,9 +99,6 @@ pub(super) fn spell_data() -> &'static SpellData {
         malice: Ladder::talent(14138, 5),
         murder: Ladder::talent(14158, 2),
         mutilate: Ladder::ranked(&[1310707, 399956, 1241582, 1241584]),
-        mutilate_triggered: Ladder::ranked(&[
-            399960, 399961, 1241585, 1241586, 1241588, 1241590, 1310705, 1310706,
-        ]),
         opportunity: Ladder::talent(14057, 2),
         precision: Ladder::talent(13705, 3),
         premeditation: Ladder::ranked(&[14183]),

@@ -10,7 +10,7 @@ use crate::prepare::character::constants::{
 use crate::prepare::character::{cooldown_type, MajorCooldown};
 use crate::prepare::dbcenums;
 use crate::prepare::env::Environment;
-use crate::prepare::sim::{AuraConfig, Cooldown, EventCallbacks, Sim, UnitId};
+use crate::prepare::sim::{AuraConfig, Cooldown, EventCallbacks, Rules, Sim, UnitId};
 use crate::prepare::spell::{school, Cast, CastConfig, ProcMask, SpellConfig, SpellFlag};
 use crate::prepare::spell_mod::{SpellModConfig, SpellModType};
 use crate::prepare::stats::Stat;
@@ -74,11 +74,17 @@ impl Rogue {
         if rank == 0 {
             return;
         }
+        // Efficient Strikes (the notes of 2 November 2026 rename Improved Sinister Strike) takes
+        // the Energy off Hemorrhage too.
+        let class_mask = match sim.rules {
+            Rules::Forever => masks::SINISTER_STRIKE | masks::HEMORRHAGE,
+            Rules::GoReference => masks::SINISTER_STRIKE,
+        };
         sim.add_static_mod(
             unit,
             SpellModConfig {
                 kind: SpellModType::PowerCostFlat,
-                class_mask: masks::SINISTER_STRIKE,
+                class_mask,
                 int_value: spell_data()
                     .improved_sinister_strike
                     .effect(dbcenums::A_ADD_FLAT_MODIFIER, dbcenums::SPELLMOD_COST)
@@ -136,7 +142,8 @@ impl Rogue {
     }
 
     /// Flawless Execution, new in Forever: the client states a flat cost reduction, which our
-    /// Forever sim reads as ten energy off Eviscerate.
+    /// Forever sim reads as ten energy off Eviscerate, fifteen since the notes of 2 November
+    /// 2026.
     fn register_flawless_execution(&self, sim: &mut Sim, unit: UnitId) {
         if !self.talents.bool("flawless_execution") {
             return;
@@ -146,10 +153,9 @@ impl Rogue {
             SpellModConfig {
                 kind: SpellModType::PowerCostFlat,
                 class_mask: masks::EVISCERATE,
-                int_value: spell_data()
-                    .flawless_execution
+                int_value: crate::prepare::hotfix_113554::row(sim.rules, 1310711)
                     .effect(dbcenums::A_ADD_FLAT_MODIFIER, dbcenums::SPELLMOD_COST)
-                    .value_at(1) as i32,
+                    .base_points as i32,
                 ..SpellModConfig::default()
             },
         );
@@ -325,12 +331,19 @@ impl Rogue {
         if rank == 0 {
             return;
         }
+        // Sinister Strike, Backstab and Eviscerate by 2/4/6%; Sinister Strike and Eviscerate by
+        // 5/10/15% since the notes of 2 November 2026.
+        let class_mask = match sim.rules {
+            Rules::Forever => masks::SINISTER_STRIKE | masks::EVISCERATE,
+            Rules::GoReference => masks::SINISTER_STRIKE | masks::BACKSTAB | masks::EVISCERATE,
+        };
         sim.add_static_mod(
             unit,
             SpellModConfig {
                 kind: SpellModType::DamageDoneFlat,
-                class_mask: masks::SINISTER_STRIKE | masks::BACKSTAB | masks::EVISCERATE,
-                float_value: spell_data().aggression.fraction_at(rank),
+                class_mask,
+                float_value: crate::prepare::hotfix_113554::talent(sim.rules, 18427, 3)
+                    .fraction_at(rank),
                 ..SpellModConfig::default()
             },
         );
