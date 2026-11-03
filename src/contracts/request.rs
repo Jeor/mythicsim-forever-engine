@@ -16,6 +16,7 @@ mod sha256;
 mod wire;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 pub use schema::{FieldKind, FieldSchema};
 
@@ -66,7 +67,9 @@ pub enum Value {
 pub struct Message {
     /// The message's schema, kept so reading a field looks up only the field.
     schema: &'static schema::MessageSchema,
-    fields: BTreeMap<u32, Value>,
+    // Preparation clones messages for each aura combination. Share immutable fields
+    // until a setter needs its own copy, without sharing mutable simulation state.
+    fields: Arc<BTreeMap<u32, Value>>,
 }
 
 impl std::fmt::Debug for Message {
@@ -131,7 +134,7 @@ impl Message {
             .unwrap_or_else(|err| panic!("unknown message {type_name}: {err}"));
         Message {
             schema,
-            fields: BTreeMap::new(),
+            fields: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -310,9 +313,9 @@ impl Message {
     pub fn set_bool(&mut self, name: &str, value: bool) {
         let number = self.field(name).number;
         if value {
-            self.fields.insert(number, Value::Bool(true));
+            Arc::make_mut(&mut self.fields).insert(number, Value::Bool(true));
         } else {
-            self.fields.remove(&number);
+            Arc::make_mut(&mut self.fields).remove(&number);
         }
     }
 
@@ -320,9 +323,9 @@ impl Message {
     pub fn set_i32(&mut self, name: &str, value: i32) {
         let number = self.field(name).number;
         if value != 0 {
-            self.fields.insert(number, Value::Int(i64::from(value)));
+            Arc::make_mut(&mut self.fields).insert(number, Value::Int(i64::from(value)));
         } else {
-            self.fields.remove(&number);
+            Arc::make_mut(&mut self.fields).remove(&number);
         }
     }
 

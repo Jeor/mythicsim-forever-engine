@@ -2,18 +2,24 @@
 """Measure whole Quick Sim jobs in Go and in Rust: time, CPU, peak memory and process overhead.
 
 The fight benchmarks time the iteration loop only. A routed job also starts processes, parses
-the request, prepares the character with the Go exporter and gates the input. This tool runs
+the request, prepares the character and gates the input. This tool runs
 each production request as the worker would, from a bundle that `tools/shadow.py build` made:
 
 go          The pinned Go engine on the RaidSimRequest: one process, `EXPORTER sim`.
-rust        `tools/route.py --request` from the bundle: Python, the exporter's prepare and one
-            Rust process that gates the prepared input and simulates it, as the worker runs it.
+rust        `tools/route.py --request` from the bundle: Python and one Rust process that
+            prepares, gates and simulates, with the bundle's configured refusal/fallback policy.
 
-It also runs route.py's two steps on their own, so the record shows where the Rust job's time
-and memory go. Every job of a case has the same request, seed, iteration count and report
+It also measures Go preparation, Rust preparation and prepared simulation as separate
+diagnostic processes, not additive phases of the routed job. Every job of a case has the
+same request, seed, iteration count and report
 depth. Rounds interleave the engines; each figure is the median over the rounds. Peak memory
 is the largest resident set of the job's processes, from wait4. With --concurrency N, a second
 phase runs every case's job N at a time in each engine and records the throughput.
+
+Each row's samples retain the unrounded measurements by zero-based round: go, rust and
+rust_steps (null when that round did not route to Rust). Throughput samples retain case,
+round and measurement in submission order, not completion order. Existing summaries remain
+rounded medians; the raw samples let readers inspect variation and reconstruct them.
 
     python3 tools/job_bench.py --bundle BUNDLE --output SCRATCH/report.json \\
         [--rounds 3] [--iterations 3000] [--concurrency 4] [CASE...]
@@ -137,7 +143,9 @@ def throughput(engine, cases, requests, bundle, scratch, concurrency, rounds):
     wall = time.perf_counter() - started
     return {"jobs": len(work), "wall_s": round(wall, 2), "jobs_per_minute": round(len(work) * 60 / wall, 1),
             "median_job_wall_s": round(median(samples, "wall_s"), 3),
-            "peak_rss_mb": round(max(sample["peak_rss_mb"] for sample in samples), 1)}
+            "peak_rss_mb": round(max(sample["peak_rss_mb"] for sample in samples), 1),
+            "samples": [{"case": case, "round": round_index, "measurement": sample}
+                        for (case, round_index), sample in zip(work, samples)]}
 
 
 def main():
@@ -159,15 +167,19 @@ def main():
 
     rows = []
     for case in cases:
-        go, rust, steps = [], [], []
+        go, rust, steps, samples = [], [], [], []
         for round_index in range(args.rounds):
             folder = scratch / case / str(round_index)
             go.append(go_job(bundle, requests[case], folder / "go"))
             rust.append(rust_job(bundle, requests[case], folder / "rust"))
+            round_steps = None
             if rust[-1]["decision"] == "rust":
-                steps.append(rust_steps(bundle, folder / "rust"))
+                round_steps = rust_steps(bundle, folder / "rust")
+                steps.append(round_steps)
+            samples.append({"round": round_index, "go": go[-1], "rust": rust[-1],
+                            "rust_steps": round_steps})
         row = {"case": case, "decision": rust[-1]["decision"], "preparation": rust[-1]["preparation"],
-               "go": summarize(go)}
+               "go": summarize(go), "samples": samples}
         if row["decision"] == "rust":
             row["rust"] = summarize(rust)
             row["rust_steps"] = {step: summarize([sample[step] for sample in steps],
