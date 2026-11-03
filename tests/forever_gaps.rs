@@ -763,9 +763,14 @@ fn a_swap_carries_the_weapon_specializations() {
             )
         })
         .collect();
+    // Physical damage, then Holy damage (the notes of 2 November 2026 raise both), then threat.
     assert_eq!(
         kinds,
-        [("damage_done_pct", 0.06), ("threat_multiplier_pct", -0.2)],
+        [
+            ("damage_done_pct", 0.06),
+            ("damage_done_pct", 0.06),
+            ("threat_multiplier_pct", -0.2)
+        ],
         "{mods:?}"
     );
     for callback in &mods {

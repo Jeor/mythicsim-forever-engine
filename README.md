@@ -435,6 +435,27 @@ the Go goldens and exporter uses. The departures:
   Quietus, Cutthroat, Thousand Cuts, Improved Distract), the new talents (Composure, Blood
   Splatter, Flash of Steel, Boot Knife, Death Mark, Venom's Shank and Quick Getaway) and the row
   moves. `tools/dev_notes_check.py` checks the rows of the Rogue part too.
+- The rest of the tree independent lines of the same notes, for Paladin and Mage (Forever
+  preparation, from the notes alone: no row states them yet, so the reference keeps the frozen
+  data). Paladin: Vengeance stacks up to 5 times (was 3; the 1/2/3% a stack is unchanged, and
+  its new requirement of Seal of Command is a tree rule) and Two-Handed Weapon Specialization
+  raises Holy damage as well as Physical, by the same 2/4/6% while a two-hander is in the main
+  hand (a Holy heal is not damage and keeps its value; the threat cut came with push 113554).
+  Mage: each missile of Arcane Missiles that lands rolls for Arcane Concentration, with the
+  talent's chance and internal cooldown, and an Arcane Missiles cast that finds Missile Barrage
+  up beside a Clearcasting from before leaves the Clearcasting standing (the cast's free pass is
+  Missile Barrage's). The notes do not say whether the cast or each missile rolls; each missile
+  is this engine's reading. Judgement of Fury's 4 to 3 sec is its taunt, which the sim does not
+  model. Every other Druid, Hunter, Mage, Paladin, Priest and Warlock line of the notes is
+  already in the engine (pushes 113531 and 113554, clients 70630 and 70707, and the first pass
+  above) or does nothing in a sim. Not taken: the Warrior talent changes (Flurry at 3 ranks for
+  3 swings, Improved Tactical Mastery, Bloodthrill, Reckless Swings, Improved Whirlwind and the
+  row moves), which need the launch client's tree layout; Poised (the next Energy ability after
+  the pull costs 10 less, about 10 Energy once a fight); Pounce (the engine does not cast it);
+  Frost Blast's removal (a rotation may still cast it); Ignite from Flamestrike's ticks (the
+  notes do not say a tick can crit, and only area rotations cast it); Gore Drinker (not
+  modelled); and the end of the low rank proc penalty (the engine casts level 60 ranks and never
+  applied one).
 - A damage bonus applied after the calculation is threat too (`threat_follows_damage_bonus`,
   Forever preparation), from MythicSim's Discord (26 October 2026, Vrelk: a Shadow Priest with
   no threat talents had less threat than damage). Improved Mind Flay's ramp, Ice Lance on a

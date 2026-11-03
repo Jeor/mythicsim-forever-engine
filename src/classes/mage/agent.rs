@@ -331,10 +331,16 @@ impl MageAgent {
                     aura,
                     trigger_aura,
                     proc_chance,
+                    missiles,
                     ..
                 } => {
-                    let bound =
-                        arcane_concentration::bind(&fight, aura, trigger_aura, *proc_chance)?;
+                    let bound = arcane_concentration::bind(
+                        &fight,
+                        aura,
+                        trigger_aura,
+                        *proc_chance,
+                        *missiles,
+                    )?;
                     fight.agent.arcane_concentration = Some(Rc::new(bound));
                 }
                 Effect::MissileBarrage {
