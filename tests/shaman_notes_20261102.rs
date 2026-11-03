@@ -57,7 +57,7 @@ fn effect_kinds(prepared: &Value) -> Vec<String> {
 }
 
 /// Lightning Bolt's base damage on every rank, each roughly 78% of the Classic Era rank (the
-/// maximum rank 196 to 353, "increased by 80%").
+/// maximum rank 200 to 360, "increased by 80%").
 #[test]
 fn lightning_bolt_by_rank() {
     let request = request("production-elemental-shaman");
@@ -65,7 +65,7 @@ fn lightning_bolt_by_rank() {
     let reference = prepared(&request, Rules::GoReference);
     let ids = [403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208i64];
     let new = [
-        12.0, 24.0, 42.0, 75.0, 111.0, 153.0, 199.0, 246.0, 300.0, 357.0,
+        12.0, 24.0, 42.0, 75.0, 111.0, 153.0, 199.0, 246.0, 300.0, 360.0,
     ];
     let old = [
         15.0, 27.0, 46.0, 63.0, 84.0, 115.0, 151.0, 167.0, 183.0, 200.0,
@@ -76,9 +76,27 @@ fn lightning_bolt_by_rank() {
         assert_eq!(forever_bolts[rank], (*id, new[rank]), "rank {}", rank + 1);
         assert_eq!(reference_bolts[rank], (*id, old[rank]), "rank {}", rank + 1);
     }
+    // The maximum rank is exactly 1.8 times what it was, so both ends of its roll are too: the
+    // row's variance is a share of the average and does not change.
+    let roll = |prepared: &Value| {
+        let spell = spells(prepared, "lightning_bolt")[9];
+        let damage = &spell["damage_effect"];
+        let (average, variance) = (
+            damage["average"].as_f64().unwrap(),
+            damage["variance"].as_f64().unwrap(),
+        );
+        (
+            average * (1.0 - variance / 2.0),
+            average * (1.0 + variance / 2.0),
+        )
+    };
+    let (new_min, new_max) = roll(&forever);
+    let (old_min, old_max) = roll(&reference);
+    assert!((new_min - 1.8 * old_min).abs() < 1e-9);
+    assert!((new_max - 1.8 * old_max).abs() < 1e-9);
     // The overload copy deals half of its rank.
     let overloads = averages(&forever, "lightning_bolt_overload");
-    assert_eq!(overloads[9], (15208, 178.0));
+    assert_eq!(overloads[9], (15208, 180.0));
     assert_eq!(
         averages(&reference, "lightning_bolt_overload")[9],
         (15208, 100.0)
@@ -100,7 +118,7 @@ fn chain_lightning_by_rank() {
 
     assert_eq!(
         averages(&forever, "chain_lightning"),
-        [(421, 219.0), (930, 286.0), (2860, 431.0), (10605, 515.0)]
+        [(421, 222.0), (930, 289.0), (2860, 435.0), (10605, 522.0)]
     );
     assert_eq!(
         averages(&reference, "chain_lightning"),
@@ -108,7 +126,7 @@ fn chain_lightning_by_rank() {
     );
     assert_eq!(
         averages(&forever, "chain_lightning_overload"),
-        [(421, 111.0), (930, 146.0), (2860, 219.0), (10605, 260.0)]
+        [(421, 111.0), (930, 145.0), (2860, 218.0), (10605, 261.0)]
     );
     assert_eq!(
         base_costs(&forever, "chain_lightning"),
