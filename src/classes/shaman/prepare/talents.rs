@@ -24,6 +24,19 @@ use super::spell_data::spell_data;
 use super::spells::{longest_cooldown, spell_action};
 use super::{flags, masks, Shaman};
 
+/// Call of Thunder's critical strike chance for Lightning Bolt and Chain Lightning (notes of 2
+/// November 2026).
+pub(crate) const CALL_OF_THUNDER_CRIT_PERCENT: f64 = 5.0;
+
+/// Elemental Mastery's aura label: the notes of 2 November 2026 rename the talent Lightning
+/// Mastery (the name only, the icon aside). The Go reference keeps the old name.
+pub(super) fn elemental_mastery_label(rules: Rules) -> &'static str {
+    match rules {
+        Rules::Forever => "Lightning Mastery",
+        Rules::GoReference => "Elemental Mastery",
+    }
+}
+
 /// `time.Millisecond * time.Duration(value)`: the float is cut to whole milliseconds.
 pub(super) fn millis(value: f64) -> Duration {
     (value as i64).wrapping_mul(MILLISECOND)
@@ -88,11 +101,34 @@ impl Shaman {
         // Tier 6
         self.apply_elemental_fury(sim, unit);
 
-        // Tier 5 (client 70425 moved Lava Burst up from tier 7)
+        // Tier 5 (client 70425 moved Lava Burst up from tier 7). The notes of 2 November 2026
+        // replace it with Call of Thunder in the same slot under Forever's rules.
         self.register_lava_burst_spell(sim, unit);
+        self.apply_call_of_thunder(sim, unit);
 
         // Tier 7
         self.apply_elemental_mastery(sim, unit);
+    }
+
+    /// Call of Thunder, which the development notes of 2 November 2026 put in Lava Burst's talent
+    /// slot (a saved talent string keeps its positions, so a point there now means this talent):
+    /// +5% critical strike chance for Lightning Bolt and Chain Lightning, and so for Lightning
+    /// Overload's copies, which are the same spells. One rank, no client row yet. The Go
+    /// reference keeps Lava Burst.
+    fn apply_call_of_thunder(&self, sim: &mut Sim, unit: UnitId) {
+        if sim.rules != Rules::Forever || !self.has_talent("lava_burst") {
+            return;
+        }
+        static_mod(
+            sim,
+            unit,
+            SpellModType::BonusCritPercent,
+            masks::LIGHTNING_BOLT
+                | masks::CHAIN_LIGHTNING
+                | masks::LIGHTNING_BOLT_OVERLOAD
+                | masks::CHAIN_LIGHTNING_OVERLOAD,
+            CALL_OF_THUNDER_CRIT_PERCENT,
+        );
     }
 
     /// Elemental Mastery, the tier 7 Elemental talent of client 70425: for 15 sec, Lightning
@@ -137,7 +173,7 @@ impl Shaman {
         let aura = sim.register_aura(
             unit,
             AuraConfig {
-                label: "Elemental Mastery".to_string(),
+                label: elemental_mastery_label(sim.rules).to_string(),
                 action_id: Some(spell_action(rank.id)),
                 duration: rank.duration(),
                 on_gain: Some(Rc::new(move |sim: &mut Sim, _| {

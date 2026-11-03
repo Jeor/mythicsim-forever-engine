@@ -378,9 +378,32 @@ the Go goldens and exporter uses. The departures:
   50/100/150% of Intellect (was 33/67/100%), Flurry 6/12/18/24/30% (was 5/10/15/20/25%),
   Stormstrike at 150% weapon damage on a 6 sec cooldown (was 100% and 8 sec) and Maelstrom
   Weapon at 20 procs a minute (was 10). Not yet taken, since the client has no rows or trees for
-  them: the Arms and Fury tree changes, Lightning Bolt, Chain Lightning and the shocks, Lava Burst
-  becoming Call of Thunder, Riptide, pet health and spellstones. `tools/dev_notes_check.py` checks
-  every number of both bullets against a live client spell store.
+  them: the Arms and Fury tree changes, Riptide, pet health and spellstones (Lightning Bolt,
+  Chain Lightning, the shocks and Lava Burst are in the next bullet). `tools/dev_notes_check.py`
+  checks every number of these bullets against a live client spell store.
+- The rest of the Shaman changes in the development notes of 2 November 2026 (Forever
+  preparation, from the notes' ratios; the client has no rows for them yet, and the reference
+  keeps the frozen rows; the rows are in `prepare::hotfix_113554`). Lightning Bolt: every rank's
+  base damage is "roughly 78%" of its Classic Era rank (Wowhead's Classic tooltips averaged at
+  level 60), so rank 10 is 353 (was 196), which is also the notes' "max rank increased by 80%"
+  (196 times 1.8 is 352.8); the two statements agree. Ranks 1 to 3 come out below their beta
+  numbers (12, 24 and 41 against 15, 27 and 45), which the notes' "all ranks increased"
+  contradicts; they follow the 78% and no level 60 Shaman casts them. Chain Lightning: a 2.5 sec
+  cast (was 2), primary target base damage 145% of the comparable Lightning Bolt rank (216, 283,
+  428 and 512, against Lightning Bolt ranks 6, 7, 9 and 10, the nearest by the level each is
+  learnt), mana 225% of the same ranks (248, 304, 428 and 495, was 145, 200, 250 and 315) and the
+  2.5 sec coefficient 0.714 (was 0.571). Lightning Overload's copies keep dealing half their
+  rank. Shocks: Classic Era's numbers at level 60, so Earth Shock rank 7 531 (was 301), Flame
+  Shock rank 6 292 and 80 a tick (was 166 and 44) and Frost Shock rank 4 506 (was 283), the
+  same derivation as wowsims/forever #821's preview store, which Frost Shock rank 4 matches to
+  within 3 at level 60. Lava Burst is removed: its talent slot (position 13 of the Elemental
+  tree, so saved talent strings keep their positions) gives Call of Thunder, +5% critical strike
+  chance for Lightning Bolt, Chain Lightning and their Lightning Overload copies, and no Lava
+  Burst spell is registered, so a rotation line naming it finds no spell and is dropped, as an
+  unknown spell is. Elemental Mastery's aura reads Lightning Mastery (the name only). Not
+  modelled: Riptide (about 40% less mana, a 12 sec cooldown and no initial heal, which only
+  Restoration's healer sims read), the Windfury animations, Totemic Call and Elemental Reach's
+  cooldown. `tools/dev_notes_check.py` lists each row.
 - A damage bonus applied after the calculation is threat too (`threat_follows_damage_bonus`,
   Forever preparation), from MythicSim's Discord (26 October 2026, Vrelk: a Shadow Priest with
   no threat talents had less threat than damage). Improved Mind Flay's ramp, Ice Lance on a
