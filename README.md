@@ -124,6 +124,13 @@ the Go goldens and exporter uses. The departures:
   MP5, Spirit or Intellect refreshes it, which on a Survival Hunter is almost never. Each one's
   mana lands in a resource row of its own, named after the aura, as Innervate's does. The
   prepared player carries `casting_regen_at_once`.
+- Mana totems in the results, from MythicSim's Discord (3 November 2026): Mana Spring Totem's
+  party buff and Mana Tide Totem are MP5 auras, so their mana arrives inside the regular mana
+  ticks, and the reference books all of it as regeneration while casting or not casting, which
+  players read as the totem doing nothing. Each tick's share from a totem's MP5 lands in a
+  resource row of its own, named after the totem (`src/core/fight/mp5_sources.rs`). The mana
+  gained is the same; as with Innervate, the rest of the regeneration fills the mana bar first.
+  The prepared player carries `mp5_sources`.
 - Overhealing, from Forever's level 30 beta logs on foreverlogs.gg (1 to 24 October 2026, 74
   public reports): a healer sim counts each heal less the share real Holy and Discipline
   Priests, Holy Paladins and Restoration Druids and Shamans overhealed of it, such as Flash Heal
