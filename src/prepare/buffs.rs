@@ -185,13 +185,13 @@ impl Meta {
             }
         }
         match self.kind {
-            MetaKind::Buff => self.buff(
-                sim,
-                unit,
-                is_player,
-                talent_points,
-                self.options(talent_points),
-            ),
+            MetaKind::Buff => {
+                let mut options = self.options(talent_points);
+                if sim.rules == Rules::Forever {
+                    options.amount_as = forever_amounts(self.spell);
+                }
+                self.buff(sim, unit, is_player, talent_points, options)
+            }
             MetaKind::ItemCountBuff => {
                 let mut options = self.options(0);
                 options.count = count;
@@ -334,10 +334,12 @@ pub(crate) fn tristate(effect: i32, regular: i32, improved: i32) -> i32 {
 /// reference keeps the data's amounts.
 ///
 /// Client 1.60.1.70630 raises Hunter's Mark rank 4 (14325, SpellEffect 690991, aura 127: ranged
-/// Attack Power for every attacker) from 71 to 143.
+/// Attack Power for every attacker) from 71 to 143. The live hotfix cache of 3 November 2026
+/// raises Trueshot Aura rank 5 (20906, SpellEffect 697683) from 50 to 100 ranged Attack Power.
 fn forever_amounts(spell: i32) -> Vec<(i32, f64)> {
     match spell {
         14325 => vec![(2, 143.0)],
+        20906 => vec![(1, 100.0)],
         _ => Vec::new(),
     }
 }

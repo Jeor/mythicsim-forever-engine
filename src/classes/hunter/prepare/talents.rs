@@ -14,6 +14,7 @@ use crate::prepare::sim::SpellId;
 use crate::prepare::sim::{AuraConfig, AuraId, Cooldown, EventCallbacks, Rules, Sim, MILLISECOND};
 use crate::prepare::spell::{Cast, CastConfig, ProcMask, SpellConfig, SpellFlag};
 use crate::prepare::spell_mod::{ModId, SpellModConfig, SpellModType};
+use crate::prepare::spelldata::Ladder;
 use crate::prepare::stats::{Stat, Stats};
 
 use super::spell_data::spell_data;
@@ -466,7 +467,7 @@ impl Hunter {
             class_mod(
                 SpellModType::DamageDoneFlat,
                 masks::MULTI_SHOT | masks::AIMED_SHOT | masks::VOLLEY,
-                spell_data().barrage.effect_at(1).fraction_at(rank),
+                barrage(sim.rules).effect_at(1).fraction_at(rank),
             ),
         );
     }
@@ -897,6 +898,36 @@ impl Hunter {
             sim.activate_spell_mod(id);
         } else {
             sim.deactivate_spell_mod(id);
+        }
+    }
+}
+
+/// Barrage (19461): 3/7/10% in the frozen data, 5/10/15% under Forever's rules since the live
+/// hotfix cache of 3 November 2026 (development notes of 2 November).
+fn barrage(rules: Rules) -> &'static Ladder {
+    static HOTFIX: std::sync::OnceLock<Ladder> = std::sync::OnceLock::new();
+    match rules {
+        Rules::GoReference => &spell_data().barrage,
+        Rules::Forever => {
+            HOTFIX.get_or_init(|| Ladder::talent_with_curve(19461, &[vec![5.0, 10.0, 15.0]]))
+        }
+    }
+}
+
+#[cfg(test)]
+mod barrage_tests {
+    use super::*;
+
+    #[test]
+    fn barrage_is_5_10_15_under_forever_rules() {
+        let forever = barrage(Rules::Forever).effect_at(1);
+        let reference = barrage(Rules::GoReference).effect_at(1);
+        for (rank, f, r) in [(1, 0.05, 0.03), (2, 0.10, 0.07), (3, 0.15, 0.10)] {
+            assert!((forever.fraction_at(rank) - f).abs() < 1e-9, "rank {rank}");
+            assert!(
+                (reference.fraction_at(rank) - r).abs() < 1e-9,
+                "rank {rank}"
+            );
         }
     }
 }

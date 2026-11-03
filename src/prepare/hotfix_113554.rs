@@ -7,6 +7,10 @@
 //! SpellEffect or Spell column. They come from wowsims/forever #769 (push 113531) and #770 (push
 //! 113554), which regenerated the store from Raidbots' `forever` DBCache.bin, and agree with
 //! Wowhead's Forever tooltips. Paladin and Priest rows are not here.
+//!
+//! The live hotfix cache of 3 November 2026 (still client 1.60.1.70707), which carries the Hunter
+//! part of Blizzard's development notes of 2 November, is here too: wowsims/forever #824
+//! regenerated the store from it (`--cdn --dbcache --carry-hotfixes`).
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -41,6 +45,67 @@ pub(crate) const FIRE_BLAST_CATEGORY: i16 = 19;
 /// Hunter cooldown category 411, Explosive Trap's and Immolation Trap's, which Freezing Trap and
 /// Frost Trap join from their own 2183 (push 113554).
 pub(crate) const FIRE_TRAP_CATEGORY: i16 = 411;
+
+/// The Hunter shot rows the live hotfix cache of 3 November raised, as (spell, SpellEffect, base
+/// points). wowsims/forever #824's `spells_auto_gen.go` diff.
+pub(crate) const HUNTER_SHOTS_20261103: [(i32, i32, f64); 32] = [
+    // Aimed Shot ranks 1 to 6: 20, 34, 55, 89, 125, 166 before.
+    (19434, 696631, 40.0),
+    (20900, 697762, 70.0),
+    (20901, 699653, 115.0),
+    (20902, 697763, 185.0),
+    (20903, 699670, 260.0),
+    (20904, 697764, 350.0),
+    // Arcane Shot ranks 1 to 8: 20, 26, 39, 65, 94, 134, 170, 217 before.
+    (3044, 680797, 25.0),
+    (14281, 691213, 35.0),
+    (14282, 691984, 50.0),
+    (14283, 692127, 85.0),
+    (14284, 690859, 120.0),
+    (14285, 690933, 175.0),
+    (14286, 690976, 220.0),
+    (14287, 691069, 280.0),
+    // Serpent Sting ranks 1 to 9, a tick: 2, 6, 12, 22, 34, 48, 64, 83, 111 before.
+    (1978, 679708, 3.0),
+    (13549, 691588, 7.0),
+    (13550, 691589, 14.0),
+    (13551, 691570, 26.0),
+    (13552, 690760, 40.0),
+    (13553, 690132, 58.0),
+    (13554, 691479, 75.0),
+    (13555, 690655, 100.0),
+    (25295, 702403, 135.0),
+    // Sniper Shot ranks 1 to 3: 160, 225, 295 before.
+    (1310687, 1340384, 320.0),
+    (1310785, 1340617, 450.0),
+    (1310786, 1340619, 590.0),
+    // Aspect of the Hawk ranks 1 to 6, ranged Attack Power: 15, 22, 30, 38, 47, 55 before. Rank 6
+    // (14322) is the one a level 60 Hunter knows under Forever's rules (rank 7, 25296, is an
+    // Ahn'Qiraj 20 book rank, and stays 120).
+    (13165, 690400, 20.0),
+    (14318, 691884, 35.0),
+    (14319, 691886, 50.0),
+    (14320, 692212, 70.0),
+    (14321, 692607, 90.0),
+    (14322, 692138, 110.0),
+];
+
+/// Trueshot Aura's ranged Attack Power by rank under the live hotfix cache of 3 November: 20, 35,
+/// 50, 75 and 100 (rank 5, 20906, SpellEffect 697683, was 50).
+pub(crate) const TRUESHOT_AURA_20261103: [(i32, f64); 5] = [
+    (1299346, 20.0),
+    (1299348, 35.0),
+    (19506, 50.0),
+    (20905, 75.0),
+    (20906, 100.0),
+];
+
+/// Every Starfire rank (1 to 7).
+pub(crate) const STARFIRE_RANKS: [i32; 7] = [2912, 8949, 8950, 8951, 9875, 9876, 25298];
+
+/// Starfire's damage under the development notes of 2 November 2026: "about 40%" more, which no
+/// row states yet.
+pub(crate) const STARFIRE_NOTES_SCALE: f64 = 1.4;
 
 fn build() -> HashMap<i32, &'static Spell> {
     let mut rows: HashMap<i32, Spell> = HashMap::new();
@@ -118,6 +183,25 @@ fn build() -> HashMap<i32, &'static Spell> {
         patch(id, &|row| row.category = FIRE_TRAP_CATEGORY);
     }
 
+    // Hunter (live hotfix cache of 3 November, development notes of 2 November): every rank of
+    // Aimed Shot (about 110% more bonus damage), Arcane Shot (about 30% more), Serpent Sting
+    // (about 20% more a tick), Sniper Shot (twice the bonus damage) and Aspect of the Hawk ranks
+    // 1 to 6. The old values are 70707's, which the frozen data shares for these rows.
+    for (spell, id, points) in HUNTER_SHOTS_20261103 {
+        patch(spell, &|row| effect(row, id).base_points = points);
+    }
+
+    // Druid (development notes of 2 November): Starfire's base damage "increased by about 40%".
+    // No row states the new values yet, so every rank's damage (base points and points per
+    // level) is scaled by [`STARFIRE_NOTES_SCALE`], a placeholder until the client carries them.
+    for id in STARFIRE_RANKS {
+        patch(id, &|row| {
+            let damage = &mut row.effects[0];
+            damage.base_points *= STARFIRE_NOTES_SCALE;
+            damage.ppl *= STARFIRE_NOTES_SCALE;
+        });
+    }
+
     rows.into_iter()
         .map(|(id, row)| (id, &*Box::leak(Box::new(row))))
         .collect()
@@ -150,6 +234,13 @@ mod tests {
         assert_eq!(primal_bite.spell_level, 60);
         assert_eq!(hotfixed(1322605).unwrap().cooldown_ms, 8000);
         assert!(hotfixed(25306).is_none());
+        for (spell, id, points) in HUNTER_SHOTS_20261103 {
+            let row = hotfixed(spell).unwrap();
+            let effect = row.effects.iter().find(|effect| effect.id == id).unwrap();
+            assert_eq!(effect.base_points, points, "spell {spell}");
+        }
+        let starfire = hotfixed(9876).unwrap();
+        assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
     }
 
     #[test]
