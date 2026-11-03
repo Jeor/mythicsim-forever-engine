@@ -5,7 +5,11 @@ use std::rc::Rc;
 
 use crate::{
     contracts::prepared_v2::{Effect, PreparedV2, Spell as ExportedSpell, Weapon},
-    core::fight::{heals::HealBook, Agent, AuraRef, DotId, Fight, Side, SpellId, SpellResult},
+    core::fight::{
+        heals::HealBook,
+        poised::{self, Poised},
+        Agent, AuraRef, DotId, Fight, Side, SpellId, SpellResult,
+    },
 };
 
 use super::{
@@ -90,6 +94,8 @@ pub(crate) enum DruidAura {
     EclipseTrigger,
     Innervate,
     CatForm,
+    /// Poised, the Cat Form druid's first cheaper Energy ability (Forever's rules).
+    Poised,
     Prowl,
     Berserk,
     BloodFrenzy,
@@ -157,6 +163,7 @@ pub(crate) struct DruidAgent {
     pub(crate) last_cat_form_energy: f64,
     pub(crate) last_cat_form_exit: i64,
     pub(crate) cat_form: Option<Rc<CatForm>>,
+    poised: Option<Rc<Poised>>,
     pub(crate) prowl: Option<Rc<Prowl>>,
     builders: Option<Rc<CatBuilders>>,
     rip: Option<Rc<Rip>>,
@@ -210,6 +217,7 @@ impl Default for DruidAgent {
             last_cat_form_energy: 0.0,
             last_cat_form_exit: 0,
             cat_form: None,
+            poised: None,
             prowl: None,
             builders: None,
             rip: None,
@@ -268,6 +276,7 @@ fn class_auras(prepared: &PreparedV2) -> Vec<(String, DruidAura)> {
             }
             Effect::Innervate { aura, .. } => auras.push((aura.clone(), DruidAura::Innervate)),
             Effect::CatForm { aura, .. } => auras.push((aura.clone(), DruidAura::CatForm)),
+            Effect::Poised { aura, .. } => auras.push((aura.clone(), DruidAura::Poised)),
             Effect::Prowl { aura, .. } => auras.push((aura.clone(), DruidAura::Prowl)),
             Effect::Berserk { aura, .. } => auras.push((aura.clone(), DruidAura::Berserk)),
             Effect::BloodFrenzy {
@@ -661,6 +670,14 @@ impl DruidAgent {
                         },
                     )?;
                     fight.agent.cat_form = Some(Rc::new(bound));
+                }
+                Effect::Poised {
+                    aura,
+                    cost_reduction,
+                    class_spells,
+                } => {
+                    let bound = poised::bind(&mut fight, aura, *cost_reduction, class_spells)?;
+                    fight.agent.poised = Some(Rc::new(bound));
                 }
                 Effect::Prowl {
                     spell_id,
@@ -1363,6 +1380,10 @@ impl Agent for DruidAgent {
         if let Some(cat) = fight.agent.cat_form.clone() {
             cat.clear_form(fight);
             fight.activate_aura(cat.aura);
+            // Out of combat at maximum Energy in Cat Form: the fight's opener has Poised.
+            if let Some(poised) = fight.agent.poised.clone() {
+                poised.on_reset(fight);
+            }
         } else if let Some(bear) = fight.agent.bear_form.clone() {
             bear.clear_form(fight);
             fight.activate_aura(bear.aura);
@@ -1463,6 +1484,20 @@ impl Agent for DruidAgent {
         }
     }
 
+    /// Poised's `OnApplyEffects`: the first Energy ability spends it.
+    fn on_apply_effects(
+        fight: &mut Fight<Self>,
+        _aura: AuraRef,
+        kind: DruidAura,
+        spell: SpellId,
+        _target: Side,
+    ) {
+        if kind == DruidAura::Poised {
+            let poised = fight.agent.poised.clone().expect("bound");
+            poised.on_apply_effects(fight, spell);
+        }
+    }
+
     fn on_gain(fight: &mut Fight<Self>, _aura: AuraRef, kind: DruidAura) {
         match kind {
             DruidAura::Clearcasting => Self::omen(fight).on_gain(fight),
@@ -1470,6 +1505,7 @@ impl Agent for DruidAgent {
             DruidAura::Eclipse => Self::eclipse(fight).on_gain(fight),
             DruidAura::Innervate => Self::innervate(fight).on_gain(fight),
             DruidAura::CatForm => Self::cat_form(fight).on_gain(fight),
+            DruidAura::Poised => fight.agent.poised.clone().expect("bound").on_gain(fight),
             DruidAura::Prowl => Self::prowl(fight).on_gain(fight),
             DruidAura::Berserk => fight.agent.berserk.expect("bound").on_gain(fight),
             DruidAura::BearForm => fight.agent.bear_form.clone().expect("bound").on_gain(fight),
@@ -1486,6 +1522,7 @@ impl Agent for DruidAgent {
             DruidAura::Eclipse => Self::eclipse(fight).on_expire(fight),
             DruidAura::Innervate => Self::innervate(fight).on_expire(fight),
             DruidAura::CatForm => Self::cat_form(fight).on_expire(fight),
+            DruidAura::Poised => fight.agent.poised.clone().expect("bound").on_expire(fight),
             DruidAura::Prowl => Self::prowl(fight).on_expire(fight),
             DruidAura::Berserk => fight.agent.berserk.expect("bound").on_expire(fight),
             DruidAura::FaerieFire => {

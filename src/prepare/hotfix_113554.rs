@@ -276,6 +276,15 @@ pub(crate) const MUTILATE_WEAPON_SHARE_20261102: f64 = 90.0;
 /// SpellEffect 1340441 of 1310711.
 pub(crate) const FLAWLESS_EXECUTION_COST_20261102: f64 = -15.0;
 
+/// Riptide's three ranks and their mana cost under the notes of 2 November: "reduced by about
+/// 40%" (245, 300 and 385 before, each times 0.6 rounded down), as (spell, mana). The notes also
+/// give it a 12 sec cooldown (was 6) and drop its initial heal, leaving the heal over time.
+pub(crate) const RIPTIDE_COSTS_20261102: [(i32, i32); 3] =
+    [(408521, 147), (1239242, 180), (1239243, 231)];
+
+/// Riptide's cooldown under the notes of 2 November.
+pub(crate) const RIPTIDE_COOLDOWN_MS_20261102: i32 = 12000;
+
 /// Every rank of Slam, whose cooldown the notes of 2 November cut from 18 to 15 sec.
 pub(crate) const SLAM_RANKS: [i32; 5] = [1240193, 1464, 8820, 11604, 11605];
 
@@ -421,6 +430,17 @@ fn build() -> HashMap<i32, &'static Spell> {
         });
     }
 
+    // Shaman (notes of 2 November): Riptide costs about 40% less mana, has a 12 sec cooldown (was
+    // 6) and no initial heal, only the heal over time. The direct heal (effect 1, a heal) turns
+    // into an inert dummy so the effects keep their places: the Chain Heal bonus reads the third.
+    for (id, cost) in RIPTIDE_COSTS_20261102 {
+        patch(id, &|row| {
+            row.powers[0].cost = cost;
+            row.category_cooldown_ms = RIPTIDE_COOLDOWN_MS_20261102;
+            row.effects[0].effect_type = dbcenums::E_DUMMY;
+        });
+    }
+
     rows.into_iter()
         .map(|(id, row)| (id, &*Box::leak(Box::new(row))))
         .collect()
@@ -492,6 +512,19 @@ mod tests {
         let flawless = hotfixed(1310711).unwrap();
         assert_eq!(flawless.effects[0].base_points, -15.0);
         assert_eq!(must_find(1310711).effects[0].base_points, -10.0);
+        for (id, mana) in RIPTIDE_COSTS_20261102 {
+            let riptide = hotfixed(id).unwrap();
+            assert_eq!(riptide.powers[0].cost, mana, "{id}");
+            assert_eq!(riptide.category_cooldown_ms, 12000, "{id}");
+            // The heal effect is gone and the heal over time and the Chain Heal bonus keep their
+            // places.
+            assert!(riptide.heal_effect().is_nil(), "{id}");
+            assert_eq!(riptide.effects[1].aura, dbcenums::A_PERIODIC_HEAL, "{id}");
+            assert_eq!(riptide.effects[2].base_points, 25.0, "{id}");
+            assert_eq!(must_find(id).category_cooldown_ms, 6000, "{id}");
+            assert!(!must_find(id).heal_effect().is_nil(), "{id}");
+        }
+        assert_eq!(must_find(1239243).powers[0].cost, 385);
         let starfire = hotfixed(9876).unwrap();
         assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
     }

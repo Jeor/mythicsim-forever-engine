@@ -34,6 +34,14 @@ const RIP_RANKS: [i32; 6] = [1079, 9492, 9493, 9752, 9894, 9896];
 const BITE_RANKS: [i32; 5] = [22568, 22827, 22828, 22829, 31018];
 const PROWL_RANKS: [i32; 3] = [5215, 6783, 9913];
 
+/// Poised's spell id. The client of 1.60.1.70707 has no row for Poised (the notes of 2 November
+/// 2026 add it for Druids at level 32 beside the Rogue's), so this is a provisional id beyond
+/// every id the client states, next to the Rogue's 1399002, until a client build carries the
+/// real one.
+pub(crate) const POISED_SPELL_ID: i32 = 1_399_003;
+/// The Energy Poised takes off the next Energy ability.
+pub(crate) const POISED_COST_REDUCTION: i32 = 10;
+
 /// The weapon damage percent of Shred, Claw and Ravage under these rules. Blizzard's development
 /// notes of 2 November 2026 set them to 200%, 140% and 435% (the rows state 155%, 110% and
 /// 350%, which the Go reference keeps); wowsims/forever #823 takes the same numbers.
@@ -117,6 +125,7 @@ impl Druid {
         self.register_shred_spell(sim);
         self.register_claw_spell(sim);
         self.register_prowl_spell(sim);
+        self.register_poised_aura(sim);
         self.register_ravage_spell(sim);
         self.register_shifting_power_spell(sim);
         // A cat that leaves its form to refresh Moonfire.
@@ -190,6 +199,46 @@ impl Druid {
         let mut config = melee_special(rank, masks::FEROCIOUS_BITE, SpellFlag::NONE);
         config.damage_multiplier = bleed_and_bite_scale(sim.rules);
         self.ferocious_bite = Some(self.register_spell(sim, CAT, config));
+    }
+
+    /// Poised (notes of 2 November 2026, Forever's rules only): learned at level 32. Out of combat
+    /// at maximum Energy the druid in Cat Form gains Poised, which takes 10 Energy off the next
+    /// Energy ability. Only the opener sees it, so the fight activates it at its start in Cat
+    /// Form and the first Energy ability spends it, as the Rogue's does.
+    fn register_poised_aura(&mut self, sim: &mut Sim) {
+        if sim.rules != Rules::Forever {
+            return;
+        }
+        let unit = self.unit;
+        let cost_mod = sim.add_dynamic_mod(
+            unit,
+            SpellModConfig {
+                kind: SpellModType::PowerCostFlat,
+                class_mask: masks::ENERGY_ABILITIES,
+                int_value: -POISED_COST_REDUCTION,
+                ..SpellModConfig::default()
+            },
+        );
+        let aura = sim.register_aura(
+            unit,
+            AuraConfig {
+                label: "Poised".to_string(),
+                action_id: Some(ActionId::spell(POISED_SPELL_ID)),
+                duration: NEVER_EXPIRES,
+                on_gain: Some(Rc::new(move |sim: &mut Sim, _| {
+                    sim.activate_spell_mod(cost_mod);
+                })),
+                on_expire: Some(Rc::new(move |sim: &mut Sim, _| {
+                    sim.deactivate_spell_mod(cost_mod);
+                })),
+                events: EventCallbacks {
+                    on_apply_effects: true,
+                    ..EventCallbacks::default()
+                },
+                ..AuraConfig::default()
+            },
+        );
+        self.poised_aura = Some(aura);
     }
 
     fn register_prowl_spell(&mut self, sim: &mut Sim) {

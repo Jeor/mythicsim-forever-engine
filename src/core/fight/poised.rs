@@ -1,7 +1,8 @@
 //! Poised, from the development notes of 2 November 2026 (Forever's rules): out of combat at
-//! maximum Energy the rogue gains Poised, which takes 10 Energy off the next Energy ability. The
-//! fight starts out of combat at maximum Energy, so the aura is up at the reset and the first
-//! Energy ability that applies its effects spends it, through a cost modifier the aura holds.
+//! maximum Energy a rogue, and a druid in Cat Form, gains Poised, which takes 10 Energy off the
+//! next Energy ability. The fight starts out of combat at maximum Energy, so the aura is up at
+//! the reset and the first Energy ability that applies its effects spends it, through a cost
+//! modifier the aura holds. Both classes bind it with the names of their Energy abilities.
 
 use crate::core::fight::{Agent, AuraRef, Fight, ModId, ModKind, SpellId};
 

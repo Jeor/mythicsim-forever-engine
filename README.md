@@ -363,10 +363,9 @@ the Go goldens and exporter uses. The departures:
   and 435% weapon damage (were 155%, 110% and 350%), Rend and Tear is 3% a rank (was 2%), and
   Bear Form's threat bonus is 115% (was 50%). Rip, Rake and Ferocious Bite (base and attack
   power, not the extra Energy) and Starfire (every rank) are "about 25%" and "about 40%" higher
-  in the notes, so 1.25 and 1.4 stand in until the client states them. Not modelled: Poised
-  (the next Energy ability after the pull costs 10 less, about 10 Energy once a fight), Pounce
+  in the notes, so 1.25 and 1.4 stand in until the client states them. Not modelled: Pounce
   (the engine does not cast it), and the end of the low rank talent proc penalty (the engine
-  casts level 60 ranks).
+  casts level 60 ranks). Poised is in the last bullet of these notes.
 - The same notes for Warrior, Warlock and Shaman (Forever preparation, from the notes alone; the
   rows are in `prepare::hotfix_113554`). Warrior: Defensive Stance's threat bonus 80% (was 30%),
   Slam's cooldown 15 sec (was 18), Two-Handed Weapon Specialization 2/4/6% (was 1/2/3%),
@@ -378,7 +377,7 @@ the Go goldens and exporter uses. The departures:
   50/100/150% of Intellect (was 33/67/100%), Flurry 6/12/18/24/30% (was 5/10/15/20/25%),
   Stormstrike at 150% weapon damage on a 6 sec cooldown (was 100% and 8 sec) and Maelstrom
   Weapon at 20 procs a minute (was 10). Not yet taken, since the client has no rows or trees for
-  them: the Arms and Fury tree changes, Riptide, pet health and spellstones (Lightning Bolt,
+  them: the Arms and Fury tree changes, pet health and spellstones (Lightning Bolt,
   Chain Lightning, the shocks and Lava Burst are in the next bullet). `tools/dev_notes_check.py`
   checks every number of these bullets against a live client spell store.
 - The rest of the Shaman changes in the development notes of 2 November 2026 (Forever
@@ -402,9 +401,8 @@ the Go goldens and exporter uses. The departures:
   positions) gives Call of Thunder, +5% critical strike chance for Lightning Bolt, Chain
   Lightning and their Lightning Overload copies, and no Lava Burst spell is registered, so a
   rotation line naming it finds no spell and is dropped, as an unknown spell is. Elemental
-  Mastery's aura reads Lightning Mastery (the name only). Not modelled: Riptide (about 40% less
-  mana, a 12 sec cooldown and no initial heal, which only Restoration's healer sims read), the
-  Windfury animations, Totemic Call and Elemental Reach's cooldown. `tools/dev_notes_check.py`
+  Mastery's aura reads Lightning Mastery (the name only). Not modelled: the Windfury animations,
+  Totemic Call and Elemental Reach's cooldown. Riptide is in the last bullet of these notes. `tools/dev_notes_check.py`
   lists each row.
 - The same notes for Rogue, the changes that do not depend on the new talent trees (Forever
   preparation, from the notes alone; the rows are in `prepare::hotfix_113554`, the reference keeps
@@ -435,6 +433,30 @@ the Go goldens and exporter uses. The departures:
   Quietus, Cutthroat, Thousand Cuts, Improved Distract), the new talents (Composure, Blood
   Splatter, Flash of Steel, Boot Knife, Death Mark, Venom's Shank and Quick Getaway) and the row
   moves. `tools/dev_notes_check.py` checks the rows of the Rogue part too.
+- Riptide and the Druid's Poised, the last numbers of the same notes the client does not state yet
+  (Forever preparation, the reference keeps the frozen rows; `prepare::hotfix_113554`). Riptide
+  costs "about 40%" less mana (147, 180 and 231 for its three ranks, each 60% of the 245, 300 and
+  385 rounded down), has a 12 sec cooldown (was 6) and "no initial heal, only the heal over time":
+  its heal effect is turned into an inert dummy so the heal over time (161 a tick at rank 3, five
+  ticks over its 15 sec) and the 25% Chain Heal bonus on the holder keep their effects. Only the
+  Restoration shaman's healer sims read it. A rotation that casts Riptide on its cooldown keeps it
+  on its target (15 sec outlasts the 12 sec cooldown), so the preset needs no edit for the
+  cooldown, though each cast now heals only its ticks. Poised for Druids (learned at level 32;
+  "when you are not in combat and have your maximum Energy, you will gain Poised"; the next Energy
+  ability costs 10 less) is the Rogue's mechanic (`core::fight::poised`, shared by both classes):
+  a Cat Form druid starts the fight with the aura up at maximum Energy and the first Claw, Shred,
+  Ravage, Rake, Rip or Ferocious Bite that applies its effects spends it, so Ravage from Prowl
+  costs 50 (60 before). The client has no row for it, so it has the provisional spell id 1399003,
+  beside the Rogue's 1399002. A druid that shifts into Cat Form during the fight, after the pull,
+  gets none. Warrior talent strings that put more points in a talent than it has ranks, or list
+  more talents than a tree has (42 of 509 benchmarked community builds: 35 with an 18 talent Fury
+  string, the proto's tree having 17, and seven with Improved Execute or Improved Bloodrage above
+  their two ranks) are refused under `talents` with the talent named (`prepare::talent_layout`,
+  the way the Mage, Hunter and Druid trees are), where the rank ladders used to panic with "rank 5
+  in a ladder of 2 ranks"; the Warrior still reads the Go proto's talent order (the client's own
+  layout waits for the launch client), so a string that fits its ranks but was written for another
+  order reads as it always has. `tools/dev_notes_check.py` checks Riptide's cooldown and mana
+  against a live store.
 - The rest of the tree independent lines of the same notes, for Paladin and Mage (Forever
   preparation, from the notes alone: no row states them yet, so the reference keeps the frozen
   data). Paladin: Vengeance stacks up to 5 times (was 3; the 1/2/3% a stack is unchanged, and

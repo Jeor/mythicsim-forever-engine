@@ -8,7 +8,10 @@ use std::rc::Rc;
 
 use crate::{
     contracts::prepared_v2::{Effect, PreparedV2, Spell as ExportedSpell},
-    core::fight::{Agent, AuraRef, DotId, Fight, Side, SpellId, SpellResult},
+    core::fight::{
+        poised::{self, Poised},
+        Agent, AuraRef, DotId, Fight, Side, SpellId, SpellResult,
+    },
 };
 
 use super::{
@@ -32,7 +35,6 @@ use super::{
         adrenaline_rush::AdrenalineRush,
         blade_flurry::BladeFlurry,
         cold_blood::{self, ColdBlood},
-        poised::{self, Poised},
         procs::{self, Handler, Proc},
         quietus::{self, Quietus},
         riposte::Riposte,

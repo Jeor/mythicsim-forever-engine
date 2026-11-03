@@ -28,7 +28,7 @@ use super::forms::{
     bear_form_threat_multiplier, bear_weapon, cat_weapon, form_names, spell_position,
     weapon_from_main_hand, ANIMAL_SPIRIT_REGEN_SUPPRESSION, CAT_FORM_THREAT_MULTIPLIER,
 };
-use super::{masks, Druid};
+use super::{masks, Druid, CLASS_SPELLS};
 
 /// buffs/drivers.go `innervateSpiritRegenMultiplier` and `innervateRegenTag`.
 const INNERVATE_SPIRIT_REGEN_MULTIPLIER: f64 = 5.0;
@@ -506,6 +506,19 @@ impl Druid {
                 effect["keeps_energy"] = json!(true);
             }
             effects.push(effect);
+        }
+        if let Some(aura) = self.poised_aura {
+            // The notes of 2 November 2026 (Forever's rules): Poised takes 10 Energy off the first
+            // Energy ability of a fight that starts in Cat Form.
+            effects.push(json!({
+                "kind": "poised", "aura": sim.aura(aura).label,
+                "cost_reduction": super::feral::POISED_COST_REDUCTION,
+                "class_spells": CLASS_SPELLS
+                    .iter()
+                    .filter(|entry| masks::ENERGY_ABILITIES & entry.mask != 0)
+                    .map(|entry| entry.name)
+                    .collect::<Vec<_>>(),
+            }));
         }
         if let Some(shifting_power) = self.shifting_power {
             // shifting_power.go
