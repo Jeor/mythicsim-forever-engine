@@ -361,9 +361,9 @@ the Go goldens and exporter uses. The departures:
   rank in the frozen data, and Pathfinding already sits on row 3. Druid, from the notes alone
   (the client has no rows for them yet, as #823 finds): Shred, Claw and Ravage deal 200%, 140%
   and 435% weapon damage (were 155%, 110% and 350%), Rend and Tear is 3% a rank (was 2%), and
-  Bear Form's threat bonus is 115% (was 50%). Rip, Rake and Ferocious Bite (base and attack
-  power, not the extra Energy) and Starfire (every rank) are "about 25%" and "about 40%" higher
-  in the notes, so 1.25 and 1.4 stand in until the client states them. Not modelled: Pounce
+  Bear Form's threat bonus is 115% (was 50%). Rip, Rake, Ferocious Bite and Starfire are "about
+  25%" and "about 40%" higher in the notes; the live rows of 4 November state them (the bullet
+  after Riptide and Poised below). Not modelled: Pounce
   (the engine does not cast it), and the end of the low rank talent proc penalty (the engine
   casts level 60 ranks). Poised is in the last bullet of these notes.
 - The same notes for Warrior, Warlock and Shaman (Forever preparation, from the notes alone; the
@@ -446,8 +446,9 @@ the Go goldens and exporter uses. The departures:
   ability costs 10 less) is the Rogue's mechanic (`core::fight::poised`, shared by both classes):
   a Cat Form druid starts the fight with the aura up at maximum Energy and the first Claw, Shred,
   Ravage, Rake, Rip or Ferocious Bite that applies its effects spends it, so Ravage from Prowl
-  costs 50 (60 before). The client has no row for it, so it has the provisional spell id 1399003,
-  beside the Rogue's 1399002. A druid that shifts into Cat Form during the fight, after the pull,
+  costs 50 (60 before). Its aura is spell 1328827 (the -10 Energy row of hotfix push 113578; the
+  level 32 passive that grants it is 1328829), which replaced the provisional id 1399003 the
+  notes needed before the client had a row. A druid that shifts into Cat Form during the fight, after the pull,
   gets none. Warrior talent strings that put more points in a talent than it has ranks, or list
   more talents than a tree has (42 of 509 benchmarked community builds: 35 with an 18 talent Fury
   string, the proto's tree having 17, and seven with Improved Execute or Improved Bloodrage above
@@ -457,6 +458,27 @@ the Go goldens and exporter uses. The departures:
   layout waits for the launch client), so a string that fits its ranks but was written for another
   order reads as it always has. `tools/dev_notes_check.py` checks Riptide's cooldown and mana
   against a live store.
+- The Druid rows of the live client of 4 November 2026 (Forever preparation; the reference keeps
+  the frozen rows; `prepare::hotfix_113554`), read from Wowhead's Forever tooltips and spell pages,
+  which decode the launch rows the upstream stores still lack. They replace the 1.25 and 1.4
+  placeholders of the notes' "about 25%" and "about 40%". Rip rank 6 ticks 19 plus 31.9 a combo
+  point every 2 sec (was 15 plus 25.5; the tooltip's 305, 497, 688, 880 and 1071 over 12 sec and
+  the buff text "19 + (32 * Combo Points)"). Rake rank 4 hits for 76 and bleeds 42 every 3 sec
+  (was 61 and 34). Ferocious Bite rolls 102 spread over 76 (was 82 spread over 60), adds 181 a
+  combo point (was 147) and 3.3 a point of extra Energy (was 2.7; the notes left it alone, the
+  row did not), reproducing the tooltip's 245 to 321 at one combo point up to 969 to 1045 at five.
+  Starfire's base damage and damage per level on every rank are 113, 154, 201, 277, 372, 471 and
+  533 with 1.8, 2.1, 2.2, 2.5, 3.0, 3.2 and 3.4 a level (were 81, 110, 144, 198, 266, 337 and 381
+  with 1.3, 1.5, 1.6, 1.8, 2.2, 2.3 and 2.4), the row's spread unchanged: rank 7's tooltip reads
+  510 to 597 at its level 66 cap, 533 at level 60. Shred, Claw and Ravage read 200%, 140% and
+  435% in the rows already. No row or tooltip states the attack power shares of Rip, Rake and
+  Ferocious Bite (server side), so they keep the notes' 25% (1.25 times 1%, 5% and 3% a point).
+  Rend and Tear stays 3/6/9/12/15%: the live tooltip's "20%" is the row's own base points (20 in
+  the frozen data too, beside a per rank curve of 2 to 10), the way Genesis reads "1%" and
+  Naturalist "100%". Bear Form's threat stays the notes' 115% (its tooltips state none), and
+  Moonfire, Wrath, Insect Swarm, Predatory Strikes, Naturalist and Genesis read as the engine has
+  them. Pounce rank 3 now reads 186 over 18 sec (was 150) and is not cast by the engine.
+  `tools/dev_notes_check.py` has the rows.
 - The rest of the tree independent lines of the same notes, for Paladin and Mage (Forever
   preparation, from the notes alone: no row states them yet, so the reference keeps the frozen
   data). Paladin: Vengeance stacks up to 5 times (was 3; the 1/2/3% a stack is unchanged, and
