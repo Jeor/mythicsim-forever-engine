@@ -4767,6 +4767,10 @@ pub enum Effect {
         magic: bool,
         hemorrhage_aura: String,
         hemorrhage_multiplier: f64,
+        /// Whether the debuff raises the rogue's Garrote ticks as well as Rupture's: Forever's
+        /// rules since the development notes of 2 November 2026.
+        #[serde(default, skip_serializing_if = "is_false")]
+        hemorrhage_garrote: bool,
     },
     Mutilate {
         spell_id: i32,
@@ -4811,6 +4815,18 @@ pub enum Effect {
     ThousandCuts {
         aura: String,
         cost_per_stack: i32,
+        class_spells: Vec<String>,
+    },
+    /// Shank, Forever's rules only: an off hand strike that generates Energy.
+    Shank {
+        spell_id: i32,
+        energy_gain: f64,
+    },
+    /// Poised, Forever's rules only: an aura the fight starts with, which the first Energy
+    /// ability spends, taking `cost_reduction` Energy off its cost.
+    Poised {
+        aura: String,
+        cost_reduction: i32,
         class_spells: Vec<String>,
     },
     WoundPoison {
@@ -5579,6 +5595,8 @@ impl Effect {
             Effect::Preparation { .. } => "preparation",
             Effect::RogueProc { .. } => "rogue_proc",
             Effect::ThousandCuts { .. } => "thousand_cuts",
+            Effect::Shank { .. } => "shank",
+            Effect::Poised { .. } => "poised",
             Effect::WoundPoison { .. } => "wound_poison",
             Effect::Venom { .. } => "venom",
             Effect::GhostlyStrike { .. } => "ghostly_strike",

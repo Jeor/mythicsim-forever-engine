@@ -144,7 +144,13 @@ fn rogue_effects(rogue: &Rogue, env: &Environment) -> Vec<Value> {
         "ruthlessness_action": action(14161),
     }));
     // poisons.go: each imbue's weapon proc rolls its chance, raised by Improved Poisons, inside
-    // the handler. The attack power shares are server side, from the devs (community #781).
+    // the handler. The attack power shares are server side, from the devs (community #781); the
+    // notes of 2 November 2026 double both under Forever's rules (Instant Poison 0.005 to 0.01,
+    // Deadly Poison 0.0045 to 0.009 a tick).
+    let (instant_share, deadly_share) = match env.rules {
+        Rules::Forever => (0.01, 0.009),
+        Rules::GoReference => (0.005, 0.0045),
+    };
     let bonus = poison_bonus(rogue);
     let hands = |imbue: i32| poison_proc_mask(sim, env.player, imbue).names();
     if let Some(spell) = rogue.spells.instant_poison {
@@ -152,7 +158,7 @@ fn rogue_effects(rogue: &Rogue, env: &Environment) -> Vec<Value> {
             "kind": "instant_poison", "trigger_aura": "Instant Poison",
             "spell_id": sim.spell(spell).action_id.spell_id,
             "proc_mask": hands(IMBUES.instant), "proc_chance": 0.2 + bonus,
-            "min_damage": 76.0, "max_damage": 100.0, "attack_power_share": 0.005,
+            "min_damage": 76.0, "max_damage": 100.0, "attack_power_share": instant_share,
         }));
     }
     if let Some(spell) = rogue.spells.deadly_poison {
@@ -166,7 +172,7 @@ fn rogue_effects(rogue: &Rogue, env: &Environment) -> Vec<Value> {
         effects.push(json!({
             "kind": "deadly_poison", "trigger_aura": "Deadly Poison", "spell_id": id.spell_id,
             "tag": id.tag, "proc_mask": hands(IMBUES.deadly), "proc_chance": 0.3 + bonus,
-            "tick_damage": tick_damage, "attack_power_share": 0.0045,
+            "tick_damage": tick_damage, "attack_power_share": deadly_share,
         }));
     }
     effects
