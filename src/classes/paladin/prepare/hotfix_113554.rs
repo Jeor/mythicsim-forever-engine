@@ -194,6 +194,11 @@ pub(crate) const CHAMPION_OF_THE_LIGHT: [f64; 5] = [12.0, 24.0, 36.0, 48.0, 60.0
 pub(crate) const CHAMPION_OF_THE_LIGHT_HAMMER_OF_WRATH_MS: [f64; 5] =
     [-200.0, -400.0, -600.0, -800.0, -1000.0];
 
+/// Vengeance's stacks under the notes of 2 November 2026 ("stacking up to 5 times", was 3). No
+/// client row states it yet (Vengeance's trigger, 20050, still says 3), and the value per stack
+/// keeps its 1/2/3% a rank.
+pub(crate) const VENGEANCE_MAX_STACKS: i32 = 5;
+
 /// Oath of Light (1328548), a spell the push adds: wago.tools has no row for it, so it is
 /// upstream wowsims/forever #772's, from the DBCache. An instant 8% base mana cast on the global
 /// cooldown (category 133), 40 yards, 5 minutes, holy. Its three effects state the bonus to Holy
