@@ -740,8 +740,10 @@ fn deathbone_surge_is_inert_without_a_tank() {
         ),
         other => panic!("a tank's Deathbone Surge prepared: {other:?}"),
     }
+    let mut forever_request = request.clone();
+    crate::warrior_trees_20261104::forever_request(&mut forever_request);
     let forever = forever_engine::prepare_json_with(
-        &serde_json::to_vec(&request).unwrap(),
+        &serde_json::to_vec(&forever_request).unwrap(),
         "deathbone-tank",
         forever_engine::Rules::Forever,
     )
