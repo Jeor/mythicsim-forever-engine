@@ -378,12 +378,11 @@ impl Shaman {
     }
 
     /// Go `GetOverloadChance`.
-    fn overload_chance(&self) -> f64 {
+    fn overload_chance(&self, rules: Rules) -> f64 {
         if self.talent("lightning_overload") == 0 {
             return 0.0;
         }
-        spell_data()
-            .lightning_overload
+        crate::prepare::hotfix_113554::talent(rules, 408438, 3)
             .fraction_at(self.talent("lightning_overload"))
     }
 }

@@ -123,3 +123,110 @@ fn trueshot_aura_is_100() {
         75.0
     );
 }
+
+fn spell<'a>(prepared: &'a Value, class_spell: &str) -> Vec<&'a Value> {
+    prepared["player"]["spells"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|spell| spell["class_spell"] == class_spell)
+        .collect()
+}
+
+/// The stat aura multipliers a stance or talent leaves on threat, in table order.
+fn threat_multipliers(prepared: &Value, aura: &str) -> Vec<f64> {
+    prepared["effects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|effect| effect["auras"].as_array())
+        .flatten()
+        .filter(|entry| entry["aura"] == aura && entry["stat"] == "threat")
+        .map(|entry| entry["multiplier"].as_f64().unwrap())
+        .collect()
+}
+
+/// Defensive Stance's threat 80% (was 30%) and Defiance 20% at 3 points (was 15%).
+#[test]
+fn defensive_stance_and_defiance_threat() {
+    let request = request("production-protection-warrior");
+    let forever = prepared(&request, Rules::Forever);
+    let reference = prepared(&request, Rules::GoReference);
+    assert_eq!(threat_multipliers(&forever, "Defensive Stance"), [1.8, 1.2]);
+    assert_eq!(
+        threat_multipliers(&reference, "Defensive Stance"),
+        [1.3, 1.15]
+    );
+}
+
+/// Slam's cooldown 15 sec (was 18), less Improved Slam's 5 sec at 2 points (was 3), and
+/// Two-Handed Weapon Specialization 6% at 3 points (was 3%).
+#[test]
+fn slam_and_two_handed_specialization() {
+    let request = request("production-arms-warrior");
+    let forever = prepared(&request, Rules::Forever);
+    let reference = prepared(&request, Rules::GoReference);
+    let cooldown = |prepared: &Value| spell(prepared, "slam")[0]["cd"]["duration_ns"].clone();
+    assert_eq!(cooldown(&forever), 10_000_000_000i64);
+    assert_eq!(cooldown(&reference), 15_000_000_000i64);
+    let two_handed =
+        |prepared: &Value| spell(prepared, "mortal_strike")[0]["damage_multiplier"].clone();
+    assert_eq!(two_handed(&forever), 1.06);
+    assert_eq!(two_handed(&reference), 1.03);
+}
+
+/// Shadow and Flame 20% at 5 points (was 10%); Conflagrate's chance to keep Immolate keeps its
+/// value.
+#[test]
+fn shadow_and_flame_is_twenty_percent() {
+    let request = request("production-destruction-warlock");
+    let forever = prepared(&request, Rules::Forever);
+    let reference = prepared(&request, Rules::GoReference);
+    assert_eq!(effect(&forever, "shadow_and_flame")["multiplier"], 1.2);
+    assert_eq!(effect(&reference, "shadow_and_flame")["multiplier"], 1.1);
+    assert_eq!(
+        effect(&forever, "conflagrate")["keep_immolate_chance"],
+        effect(&reference, "conflagrate")["keep_immolate_chance"]
+    );
+}
+
+/// Lightning Overload 30% at 3 points (was 10%).
+#[test]
+fn lightning_overload_is_thirty_percent() {
+    let request = request("production-elemental-shaman");
+    let forever = prepared(&request, Rules::Forever);
+    let reference = prepared(&request, Rules::GoReference);
+    assert_eq!(effect(&forever, "lightning_bolt")["overload_chance"], 0.3);
+    assert_eq!(effect(&reference, "lightning_bolt")["overload_chance"], 0.1);
+}
+
+/// Stormstrike 150% weapon damage on a 6 sec cooldown (was 100% and 8 sec), Flurry 30% at 5
+/// points (was 25%) and Maelstrom Weapon's doubled chance.
+#[test]
+fn enhancement_talents_and_stormstrike() {
+    let request = request("production-enhancement-shaman");
+    let forever = prepared(&request, Rules::Forever);
+    let reference = prepared(&request, Rules::GoReference);
+    for (prepared, multiplier, cooldown) in [
+        (&forever, 1.5, 6_000_000_000i64),
+        (&reference, 1.0, 8_000_000_000),
+    ] {
+        let strikes = spell(prepared, "stormstrike_damage");
+        assert_eq!(strikes.len(), 2);
+        assert!(strikes
+            .iter()
+            .all(|strike| strike["damage_multiplier"] == multiplier));
+        assert_eq!(
+            spell(prepared, "stormstrike_cast")[0]["cd"]["duration_ns"],
+            cooldown
+        );
+    }
+    let chance = |prepared: &Value| {
+        effect(prepared, "maelstrom_weapon")["chances"][0]["chance"]
+            .as_f64()
+            .unwrap()
+    };
+    assert!((chance(&forever) - 2.0 * chance(&reference)).abs() < 1e-12);
+    assert_eq!(effect(&forever, "flurry")["melee_speed_multiplier"], 1.3);
+    assert_eq!(effect(&reference, "flurry")["melee_speed_multiplier"], 1.25);
+}

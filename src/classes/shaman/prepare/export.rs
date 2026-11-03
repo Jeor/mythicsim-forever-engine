@@ -137,14 +137,14 @@ impl Shaman {
 
         // lightning_bolt.go: the overload rolls on landing, before the bolt deals its damage.
         effects.push(json!({
-            "kind": "lightning_bolt", "overload_chance": self.overload_chance(),
+            "kind": "lightning_bolt", "overload_chance": self.overload_chance(sim.rules),
             "overload_tag": CAST_TAG_LIGHTNING_OVERLOAD,
             "rng_label": "Lightning Bolt Elemental Overload",
         }));
         // chain_lightning.go: a third of the overload chance per hit, and a Go literal bounce
         // reduction.
         effects.push(json!({
-            "kind": "chain_lightning", "overload_chance": self.overload_chance(),
+            "kind": "chain_lightning", "overload_chance": self.overload_chance(sim.rules),
             "overload_tag": CAST_TAG_LIGHTNING_OVERLOAD,
             "rng_label": "Chain Lightning Elemental Overload", "bounce_reduction": 0.7,
             "bounce_bonus": sim.state(self.chain_lightning_bounce_bonus),
@@ -226,7 +226,8 @@ impl Shaman {
             // talents_enhancement.go applyFlurry: a Go literal 500 ms charge cooldown.
             effects.push(json!({
                 "kind": "flurry", "trigger_aura": "Flurry Trigger", "aura": "Flurry",
-                "melee_speed_multiplier": data.flurry.multiplier_at(talent("flurry")),
+                "melee_speed_multiplier": crate::prepare::hotfix_113554::talent(sim.rules, 16256, 5)
+                    .multiplier_at(talent("flurry")),
                 "charge_icd_ns": nanos(500 * MILLISECOND),
                 "max_stacks": i32::from(data.flurry_triggered.highest().proc_charges),
                 // Forever's rank 16256 lacks the bit: a hit from a spell flagged Proc does not

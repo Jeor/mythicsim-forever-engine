@@ -17,6 +17,8 @@ use std::sync::OnceLock;
 
 use crate::data::spells::{Effect, Spell};
 
+use super::spelldata::Ladder;
+
 use super::dbcenums;
 use super::sim::Rules;
 use super::spelldata::must_find;
@@ -106,6 +108,65 @@ pub(crate) const STARFIRE_RANKS: [i32; 7] = [2912, 8949, 8950, 8951, 9875, 9876,
 /// Starfire's damage under the development notes of 2 November 2026: "about 40%" more, which no
 /// row states yet.
 pub(crate) const STARFIRE_NOTES_SCALE: f64 = 1.4;
+
+/// Talents whose per rank values Blizzard's development notes of 2 November 2026 change while
+/// keeping the rank count, as the curve each takes under Forever's rules: one row per effect, in
+/// effect order, as the client states curves. No client row states them yet.
+const TALENT_CURVES_20261102: &[(i32, &[&[f64]])] = &[
+    // Hunter: Barrage 5/10/15% (was 3/7/10%; the 3 November cache states it).
+    (19461, &[&[5.0, 10.0, 15.0]]),
+    // Warrior: Two-Handed Weapon Specialization 2/4/6% (was 1/2/3%), Defiance 7/13/20% threat
+    // (was 5/10/15%), and Improved Slam's cooldown cut 2.5/5 sec (its third effect, was 3 sec at
+    // either rank; the cast time and GCD curves keep their values).
+    (12163, &[&[2.0, 4.0, 6.0]]),
+    (12792, &[&[7.0, 13.0, 20.0]]),
+    (
+        12862,
+        &[&[-250.0, -500.0], &[-250.0, -500.0], &[-2500.0, -5000.0]],
+    ),
+    // Warlock: Shadow and Flame's Shadow and Fire damage 4/8/12/16/20% (its third and fourth
+    // effects, were 2/4/6/8/10%; Go reads the third). The second, Conflagrate's chance to keep
+    // Immolate, and the first keep theirs.
+    (
+        426316,
+        &[
+            &[4.0, 8.0, 12.0, 16.0, 20.0],
+            &[20.0, 40.0, 60.0, 80.0, 100.0],
+            &[4.0, 8.0, 12.0, 16.0, 20.0],
+            &[4.0, 8.0, 12.0, 16.0, 20.0],
+        ],
+    ),
+    // Shaman: Lightning Overload 10/20/30% (was 3/7/10%), Mental Dexterity 50/100/150% of
+    // Intellect (was 33/67/100%), Flurry 6/12/18/24/30% (was 5/10/15/20/25%).
+    (408438, &[&[10.0, 20.0, 30.0]]),
+    (415140, &[&[50.0, 100.0, 150.0]]),
+    (16256, &[&[6.0, 12.0, 18.0, 24.0, 30.0]]),
+];
+
+/// A talent's ladder under `rules`: the curve of [`TALENT_CURVES_20261102`] under Forever's rules
+/// where one is listed, the frozen data's otherwise (Go `Talent`).
+pub(crate) fn talent(rules: Rules, spell_id: i32, max_ranks: i32) -> Ladder {
+    static LADDERS: OnceLock<HashMap<i32, Ladder>> = OnceLock::new();
+    if rules == Rules::Forever {
+        let ladders = LADDERS.get_or_init(|| {
+            TALENT_CURVES_20261102
+                .iter()
+                .map(|(id, curve)| {
+                    let rows: Vec<Vec<f64>> = curve.iter().map(|row| row.to_vec()).collect();
+                    (*id, Ladder::talent_with_curve(*id, &rows))
+                })
+                .collect()
+        });
+        if let Some(ladder) = ladders.get(&spell_id) {
+            assert_eq!(ladder.len(), max_ranks, "talent {spell_id} rank count");
+            return ladder.clone();
+        }
+    }
+    Ladder::talent(spell_id, max_ranks)
+}
+
+/// Every rank of Slam, whose cooldown the notes of 2 November cut from 18 to 15 sec.
+pub(crate) const SLAM_RANKS: [i32; 5] = [1240193, 1464, 8820, 11604, 11605];
 
 fn build() -> HashMap<i32, &'static Spell> {
     let mut rows: HashMap<i32, Spell> = HashMap::new();
@@ -202,6 +263,23 @@ fn build() -> HashMap<i32, &'static Spell> {
         });
     }
 
+    // Warrior (notes of 2 November): Defensive Stance's threat bonus 30% to 80% (Defensive Stance
+    // Passive, SpellEffect 686475), and Slam's 18 sec cooldown to 15 on every rank.
+    patch(7376, &|row| effect(row, 686475).base_points = 80.0);
+    for id in SLAM_RANKS {
+        patch(id, &|row| row.category_cooldown_ms = 15000);
+    }
+    // Warlock (notes of 2 November): Wrack's spell damage coefficient doubles (0.143 to 0.286
+    // a tick, "0.286 per second of cast time") and its base damage a second grows 2.5 a level,
+    // from 36 at its level 40 to 86 at 60 (was 36 at every level).
+    patch(1316697, &|row| {
+        let tick = effect(row, 1349556);
+        tick.ppl = 2.5;
+        tick.sp_coef *= 2.0;
+    });
+    // Shaman (notes of 2 November): Stormstrike's cooldown 8 sec to 6.
+    patch(17364, &|row| row.cooldown_ms = 6000);
+
     rows.into_iter()
         .map(|(id, row)| (id, &*Box::leak(Box::new(row))))
         .collect()
@@ -239,6 +317,21 @@ mod tests {
             let effect = row.effects.iter().find(|effect| effect.id == id).unwrap();
             assert_eq!(effect.base_points, points, "spell {spell}");
         }
+        let wrack = row(Rules::Forever, 1316697);
+        assert_eq!(wrack.effects[0].average(60), 86.0);
+        assert_eq!(must_find(1316697).effects[0].average(60), 36.0);
+        assert!((wrack.effects[0].sp_coef - 0.286).abs() < 1e-6);
+        let stance = hotfixed(7376).unwrap();
+        let threat = stance
+            .effects
+            .iter()
+            .find(|effect| effect.id == 686475)
+            .unwrap();
+        assert_eq!(threat.base_points, 80.0);
+        for id in SLAM_RANKS {
+            assert_eq!(hotfixed(id).unwrap().category_cooldown_ms, 15000);
+        }
+        assert_eq!(hotfixed(17364).unwrap().cooldown_ms, 6000);
         let starfire = hotfixed(9876).unwrap();
         assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
     }

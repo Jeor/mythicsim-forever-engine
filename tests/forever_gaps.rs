@@ -686,8 +686,9 @@ fn seal_of_justice_judges_justice() {
 fn warrior_strikes_and_freezing_trap_run() {
     for (name, spell_id, casts) in [
         ("protection-warrior-shield-bash", 1672, 531.0),
-        // 77 since the book ranks (#183) and two-hand crit rage (#184) changed the rage a fight has.
-        ("arms-warrior-mocking-blow", 20560, 77.0),
+        // 78 since the notes of 2 November (Two-Handed Weapon Specialization 6%, Slam on 15 sec)
+        // changed the rage a fight has (77 after #183 and #184).
+        ("arms-warrior-mocking-blow", 20560, 78.0),
         ("protection-warrior-disarm", 676, 129.0),
         ("warrior-intercept", 20617, 50.0),
         ("arms-warrior-revenge", 25288, 0.0),

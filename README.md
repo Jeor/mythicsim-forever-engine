@@ -360,6 +360,20 @@ the Go goldens and exporter uses. The departures:
   (the next Energy ability after the pull costs 10 less, about 10 Energy once a fight), Pounce
   (the engine does not cast it), and the end of the low rank talent proc penalty (the engine
   casts level 60 ranks).
+- The same notes for Warrior, Warlock and Shaman (Forever preparation, from the notes alone; the
+  rows are in `prepare::hotfix_113554`). Warrior: Defensive Stance's threat bonus 80% (was 30%),
+  Slam's cooldown 15 sec (was 18), Two-Handed Weapon Specialization 2/4/6% (was 1/2/3%),
+  Improved Slam's cooldown cut 2.5/5 sec (was 3 at either rank) and Defiance 7/13/20% (was
+  5/10/15%). Warlock: Wrack's spell damage coefficient doubled (0.143 to 0.286 a tick) and its
+  base damage a second growing 2.5 a level from level 40, so 86 at 60 (was 36 at every level),
+  and Shadow and Flame's Shadow and Fire bonus 4/8/12/16/20% (was 2/4/6/8/10%; its chance to keep
+  Immolate is unchanged). Shaman: Lightning Overload 10/20/30% (was 3/7/10%), Mental Dexterity
+  50/100/150% of Intellect (was 33/67/100%), Flurry 6/12/18/24/30% (was 5/10/15/20/25%),
+  Stormstrike at 150% weapon damage on a 6 sec cooldown (was 100% and 8 sec) and Maelstrom
+  Weapon at 20 procs a minute (was 10). Not yet taken, since the client has no rows or trees for
+  them: the Arms and Fury tree changes, Lightning Bolt, Chain Lightning and the shocks, Lava Burst
+  becoming Call of Thunder, Riptide, pet health and spellstones. `tools/dev_notes_check.py` checks
+  every number of both bullets against a live client spell store.
 - A damage bonus applied after the calculation is threat too (`threat_follows_damage_bonus`,
   Forever preparation), from MythicSim's Discord (26 October 2026, Vrelk: a Shadow Priest with
   no threat talents had less threat than damage). Improved Mind Flay's ramp, Ice Lance on a
