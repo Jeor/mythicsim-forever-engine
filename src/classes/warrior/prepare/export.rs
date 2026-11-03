@@ -403,7 +403,8 @@ impl Warrior {
         }
         if talent("defiance") > 0 && sim.unit(unit).pseudo_stats.can_block {
             defiance.push(json!({"aura": "Defensive Stance", "stat": "threat",
-                "multiplier": data.defiance.effect(dbcenums::A_MOD_THREAT, 127)
+                "multiplier": crate::prepare::hotfix_113554::talent(sim.rules, 12792, 3)
+                    .effect(dbcenums::A_MOD_THREAT, 127)
                     .multiplier_at(talent("defiance"))}));
         }
         let mut pseudo_stat_auras = vec![
@@ -411,8 +412,8 @@ impl Warrior {
                 "multiplier": data.battle_stance_passive.effect(dbcenums::A_MOD_THREAT, 127)
                     .multiplier_at(1)}),
             json!({"aura": "Defensive Stance", "stat": "threat",
-                "multiplier": data.defensive_stance_passive.effect(dbcenums::A_MOD_THREAT, 127)
-                    .multiplier_at(1)}),
+                "multiplier": 1.0 + crate::prepare::hotfix_113554::row(sim.rules, data.defensive_stance_passive.highest().id)
+                    .effect(dbcenums::A_MOD_THREAT, 127).base_points / 100.0}),
             json!({"aura": "Defensive Stance", "stat": "damage_taken",
                 "multiplier": data.defensive_stance_passive
                     .effect(dbcenums::A_MOD_DAMAGE_PERCENT_TAKEN, 127).multiplier_at(1)}),

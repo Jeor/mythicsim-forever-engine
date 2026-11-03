@@ -15,7 +15,7 @@ use crate::prepare::dbcenums::{
 use crate::prepare::hotfix_113554;
 use crate::prepare::major_cooldown::COOLDOWN_PRIORITY_DEFAULT;
 use crate::prepare::sim::{
-    AuraConfig, Cooldown, EventCallbacks, Sim, MILLISECOND, NEVER_EXPIRES, SECOND,
+    AuraConfig, Cooldown, EventCallbacks, Rules, Sim, MILLISECOND, NEVER_EXPIRES, SECOND,
 };
 use crate::prepare::spell::{
     school, Cast, CastConfig, CostOptions, DotConfig, ProcMask, SpellConfig, SpellFlag,
@@ -33,6 +33,38 @@ const RAKE_RANKS: [i32; 4] = [1822, 1823, 1824, 9904];
 const RIP_RANKS: [i32; 6] = [1079, 9492, 9493, 9752, 9894, 9896];
 const BITE_RANKS: [i32; 5] = [22568, 22827, 22828, 22829, 31018];
 const PROWL_RANKS: [i32; 3] = [5215, 6783, 9913];
+
+/// The weapon damage percent of Shred, Claw and Ravage under these rules. Blizzard's development
+/// notes of 2 November 2026 set them to 200%, 140% and 435% (the rows state 155%, 110% and
+/// 350%, which the Go reference keeps); wowsims/forever #823 takes the same numbers.
+fn weapon_multiplier(rules: Rules, ladder: &Ladder, forever: f64) -> f64 {
+    match rules {
+        Rules::Forever => forever,
+        Rules::GoReference => ladder
+            .effect_at(2)
+            .fraction_at(ladder.highest().rank_number()),
+    }
+}
+
+/// The notes of 2 November 2026 raise Rip's, Rake's and Ferocious Bite's base damage and attack
+/// power scaling by "about 25%"; no row states the new values yet, so 1.25 stands in for them
+/// (wowsims/forever #823's placeholder too) until the client carries them. Ferocious Bite's
+/// damage from extra Energy keeps its value. 1 for the Go reference.
+pub(super) fn bleed_and_bite_scale(rules: Rules) -> f64 {
+    match rules {
+        Rules::Forever => 1.25,
+        Rules::GoReference => 1.0,
+    }
+}
+
+/// Rend and Tear's damage multiplier at a rank: 2% a rank in the client rows, 3% a rank under
+/// the development notes of 2 November 2026 (Forever's rules).
+pub(super) fn rend_and_tear_multiplier(rules: Rules, rank: i32) -> f64 {
+    match rules {
+        Rules::Forever => 1.0 + 0.03 * f64::from(rank),
+        Rules::GoReference => Ladder::talent(1223246, 5).effect_at(1).multiplier_at(rank),
+    }
+}
 
 fn energy_cost(rank: &Spell) -> CostOptions {
     CostOptions {
@@ -94,7 +126,7 @@ impl Druid {
     fn register_claw_spell(&mut self, sim: &mut Sim) {
         let ladder = Ladder::ranked(&CLAW_RANKS);
         let rank = ladder.highest();
-        let weapon_multiplier = ladder.effect_at(2).fraction_at(rank.rank_number());
+        let weapon_multiplier = weapon_multiplier(sim.rules, &ladder, 1.40);
         let mut config = melee_special(rank, masks::CLAW, SpellFlag::NONE);
         config.damage_multiplier = weapon_multiplier;
         self.claw = Some(self.register_spell(sim, CAT, config));
@@ -103,7 +135,7 @@ impl Druid {
     fn register_shred_spell(&mut self, sim: &mut Sim) {
         let ladder = Ladder::ranked(&SHRED_RANKS);
         let rank = ladder.highest();
-        let weapon_multiplier = ladder.effect_at(2).fraction_at(rank.rank_number());
+        let weapon_multiplier = weapon_multiplier(sim.rules, &ladder, 2.00);
         let mut config = melee_special(rank, masks::SHRED, SpellFlag::NONE);
         config.damage_multiplier = weapon_multiplier;
         self.shred = Some(self.register_spell(sim, CAT, config));
@@ -112,7 +144,7 @@ impl Druid {
     fn register_ravage_spell(&mut self, sim: &mut Sim) {
         let ladder = Ladder::ranked(&RAVAGE_RANKS);
         let rank = ladder.highest();
-        let weapon_multiplier = ladder.effect_at(2).fraction_at(rank.rank_number());
+        let weapon_multiplier = weapon_multiplier(sim.rules, &ladder, 4.35);
         let mut config = melee_special(rank, masks::RAVAGE, SpellFlag::CANNOT_BE_DODGED);
         config.damage_multiplier = weapon_multiplier;
         self.ravage = Some(self.register_spell(sim, CAT, config));
@@ -122,7 +154,7 @@ impl Druid {
         let rank = Ladder::ranked(&RAKE_RANKS).highest();
         let tick = rank.periodic_effect();
         let mut config = melee_special(rank, masks::RAKE, SpellFlag::IGNORE_RESISTS);
-        config.damage_multiplier = 1.0;
+        config.damage_multiplier = bleed_and_bite_scale(sim.rules);
         config.dot = DotConfig {
             aura: AuraConfig {
                 label: "Rake".to_string(),
@@ -140,7 +172,7 @@ impl Druid {
         let rank = Ladder::ranked(&RIP_RANKS).highest();
         let tick = rank.periodic_effect();
         let mut config = melee_special(rank, masks::RIP, SpellFlag::NONE);
-        config.damage_multiplier = 1.0;
+        config.damage_multiplier = bleed_and_bite_scale(sim.rules);
         config.dot = DotConfig {
             aura: AuraConfig {
                 label: "Rip".to_string(),
@@ -156,7 +188,7 @@ impl Druid {
     fn register_ferocious_bite_spell(&mut self, sim: &mut Sim) {
         let rank = Ladder::ranked(&BITE_RANKS).highest();
         let mut config = melee_special(rank, masks::FEROCIOUS_BITE, SpellFlag::NONE);
-        config.damage_multiplier = 1.0;
+        config.damage_multiplier = bleed_and_bite_scale(sim.rules);
         self.ferocious_bite = Some(self.register_spell(sim, CAT, config));
     }
 
@@ -522,7 +554,8 @@ impl Druid {
         );
     }
 
-    /// Rend and Tear, new in Forever: +2% a rank to melee abilities against a bleeding target.
+    /// Rend and Tear, new in Forever: +2% a rank to melee abilities against a bleeding target
+    /// (3% under Forever's rules since the notes of 2 November 2026; the export carries it).
     fn apply_rend_and_tear(&mut self, sim: &mut Sim) {
         if self.tal.rend_and_tear == 0 {
             return;

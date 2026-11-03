@@ -3,6 +3,8 @@
 
 use std::rc::Rc;
 
+use crate::Rules;
+
 use crate::prepare::aura_helpers::{CallbackMask, HitOutcome, ProcTrigger};
 use crate::prepare::character::constants::{
     DODGE_RATING_PER_DODGE_PERCENT, PHYSICAL_HIT_RATING_PER_HIT_PERCENT,
@@ -563,7 +565,8 @@ impl Shaman {
         sim.new_timer(unit);
 
         let buff = data.flurry_triggered.highest();
-        let attack_speed = data.flurry.multiplier_at(points);
+        let attack_speed =
+            crate::prepare::hotfix_113554::talent(sim.rules, 16256, 5).multiplier_at(points);
 
         let aura = sim.register_aura(
             unit,
@@ -675,14 +678,12 @@ impl Shaman {
         if points == 0 {
             return;
         }
-        sim.unit_mut(unit).sdm.add_stat_dependency(
-            Stat::Intellect,
-            Stat::AttackPower,
-            spell_data()
-                .mental_dexterity
-                .effect_at(1)
-                .fraction_at(points),
-        );
+        let fraction = crate::prepare::hotfix_113554::talent(sim.rules, 415140, 3)
+            .effect_at(1)
+            .fraction_at(points);
+        sim.unit_mut(unit)
+            .sdm
+            .add_stat_dependency(Stat::Intellect, Stat::AttackPower, fraction);
     }
 
     /// Anticipation is new in Forever: flat dodge. Go fuses the product into `AddStat`.
@@ -781,8 +782,12 @@ impl Shaman {
         let max_stacks = 5;
         let per_stack = data.maelstrom_weapon.effect_at(1).fraction_at(points);
 
-        // NewLegacyPPMManager: an item swap rebuilds it.
-        let ppm = 10.0;
+        // NewLegacyPPMManager: an item swap rebuilds it. The development notes of 2 November 2026
+        // double the chance to trigger, so 20 PPM under Forever's rules.
+        let ppm = match sim.rules {
+            Rules::Forever => 20.0,
+            Rules::GoReference => 10.0,
+        };
         let ppmm = Rc::new(
             sim.new_ppm_manager(unit, ppm, ProcMask::MELEE)
                 .rebuilt_by_swap(

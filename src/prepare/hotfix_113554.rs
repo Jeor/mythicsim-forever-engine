@@ -7,11 +7,17 @@
 //! SpellEffect or Spell column. They come from wowsims/forever #769 (push 113531) and #770 (push
 //! 113554), which regenerated the store from Raidbots' `forever` DBCache.bin, and agree with
 //! Wowhead's Forever tooltips. Paladin and Priest rows are not here.
+//!
+//! The live hotfix cache of 3 November 2026 (still client 1.60.1.70707), which carries the Hunter
+//! part of Blizzard's development notes of 2 November, is here too: wowsims/forever #824
+//! regenerated the store from it (`--cdn --dbcache --carry-hotfixes`).
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use crate::data::spells::{Effect, Spell};
+
+use super::spelldata::Ladder;
 
 use super::dbcenums;
 use super::sim::Rules;
@@ -41,6 +47,126 @@ pub(crate) const FIRE_BLAST_CATEGORY: i16 = 19;
 /// Hunter cooldown category 411, Explosive Trap's and Immolation Trap's, which Freezing Trap and
 /// Frost Trap join from their own 2183 (push 113554).
 pub(crate) const FIRE_TRAP_CATEGORY: i16 = 411;
+
+/// The Hunter shot rows the live hotfix cache of 3 November raised, as (spell, SpellEffect, base
+/// points). wowsims/forever #824's `spells_auto_gen.go` diff.
+pub(crate) const HUNTER_SHOTS_20261103: [(i32, i32, f64); 32] = [
+    // Aimed Shot ranks 1 to 6: 20, 34, 55, 89, 125, 166 before.
+    (19434, 696631, 40.0),
+    (20900, 697762, 70.0),
+    (20901, 699653, 115.0),
+    (20902, 697763, 185.0),
+    (20903, 699670, 260.0),
+    (20904, 697764, 350.0),
+    // Arcane Shot ranks 1 to 8: 20, 26, 39, 65, 94, 134, 170, 217 before.
+    (3044, 680797, 25.0),
+    (14281, 691213, 35.0),
+    (14282, 691984, 50.0),
+    (14283, 692127, 85.0),
+    (14284, 690859, 120.0),
+    (14285, 690933, 175.0),
+    (14286, 690976, 220.0),
+    (14287, 691069, 280.0),
+    // Serpent Sting ranks 1 to 9, a tick: 2, 6, 12, 22, 34, 48, 64, 83, 111 before.
+    (1978, 679708, 3.0),
+    (13549, 691588, 7.0),
+    (13550, 691589, 14.0),
+    (13551, 691570, 26.0),
+    (13552, 690760, 40.0),
+    (13553, 690132, 58.0),
+    (13554, 691479, 75.0),
+    (13555, 690655, 100.0),
+    (25295, 702403, 135.0),
+    // Sniper Shot ranks 1 to 3: 160, 225, 295 before.
+    (1310687, 1340384, 320.0),
+    (1310785, 1340617, 450.0),
+    (1310786, 1340619, 590.0),
+    // Aspect of the Hawk ranks 1 to 6, ranged Attack Power: 15, 22, 30, 38, 47, 55 before. Rank 6
+    // (14322) is the one a level 60 Hunter knows under Forever's rules (rank 7, 25296, is an
+    // Ahn'Qiraj 20 book rank, and stays 120).
+    (13165, 690400, 20.0),
+    (14318, 691884, 35.0),
+    (14319, 691886, 50.0),
+    (14320, 692212, 70.0),
+    (14321, 692607, 90.0),
+    (14322, 692138, 110.0),
+];
+
+/// Trueshot Aura's ranged Attack Power by rank under the live hotfix cache of 3 November: 20, 35,
+/// 50, 75 and 100 (rank 5, 20906, SpellEffect 697683, was 50).
+pub(crate) const TRUESHOT_AURA_20261103: [(i32, f64); 5] = [
+    (1299346, 20.0),
+    (1299348, 35.0),
+    (19506, 50.0),
+    (20905, 75.0),
+    (20906, 100.0),
+];
+
+/// Every Starfire rank (1 to 7).
+pub(crate) const STARFIRE_RANKS: [i32; 7] = [2912, 8949, 8950, 8951, 9875, 9876, 25298];
+
+/// Starfire's damage under the development notes of 2 November 2026: "about 40%" more, which no
+/// row states yet.
+pub(crate) const STARFIRE_NOTES_SCALE: f64 = 1.4;
+
+/// Talents whose per rank values Blizzard's development notes of 2 November 2026 change while
+/// keeping the rank count, as the curve each takes under Forever's rules: one row per effect, in
+/// effect order, as the client states curves. No client row states them yet.
+const TALENT_CURVES_20261102: &[(i32, &[&[f64]])] = &[
+    // Hunter: Barrage 5/10/15% (was 3/7/10%; the 3 November cache states it).
+    (19461, &[&[5.0, 10.0, 15.0]]),
+    // Warrior: Two-Handed Weapon Specialization 2/4/6% (was 1/2/3%), Defiance 7/13/20% threat
+    // (was 5/10/15%), and Improved Slam's cooldown cut 2.5/5 sec (its third effect, was 3 sec at
+    // either rank; the cast time and GCD curves keep their values).
+    (12163, &[&[2.0, 4.0, 6.0]]),
+    (12792, &[&[7.0, 13.0, 20.0]]),
+    (
+        12862,
+        &[&[-250.0, -500.0], &[-250.0, -500.0], &[-2500.0, -5000.0]],
+    ),
+    // Warlock: Shadow and Flame's Shadow and Fire damage 4/8/12/16/20% (its third and fourth
+    // effects, were 2/4/6/8/10%; Go reads the third). The second, Conflagrate's chance to keep
+    // Immolate, and the first keep theirs.
+    (
+        426316,
+        &[
+            &[4.0, 8.0, 12.0, 16.0, 20.0],
+            &[20.0, 40.0, 60.0, 80.0, 100.0],
+            &[4.0, 8.0, 12.0, 16.0, 20.0],
+            &[4.0, 8.0, 12.0, 16.0, 20.0],
+        ],
+    ),
+    // Shaman: Lightning Overload 10/20/30% (was 3/7/10%), Mental Dexterity 50/100/150% of
+    // Intellect (was 33/67/100%), Flurry 6/12/18/24/30% (was 5/10/15/20/25%).
+    (408438, &[&[10.0, 20.0, 30.0]]),
+    (415140, &[&[50.0, 100.0, 150.0]]),
+    (16256, &[&[6.0, 12.0, 18.0, 24.0, 30.0]]),
+];
+
+/// A talent's ladder under `rules`: the curve of [`TALENT_CURVES_20261102`] under Forever's rules
+/// where one is listed, the frozen data's otherwise (Go `Talent`).
+pub(crate) fn talent(rules: Rules, spell_id: i32, max_ranks: i32) -> Ladder {
+    static LADDERS: OnceLock<HashMap<i32, Ladder>> = OnceLock::new();
+    if rules == Rules::Forever {
+        let ladders = LADDERS.get_or_init(|| {
+            TALENT_CURVES_20261102
+                .iter()
+                .map(|(id, curve)| {
+                    let rows: Vec<Vec<f64>> = curve.iter().map(|row| row.to_vec()).collect();
+                    (*id, Ladder::talent_with_curve(*id, &rows))
+                })
+                .collect()
+        });
+        if let Some(ladder) = ladders.get(&spell_id) {
+            assert_eq!(ladder.len(), max_ranks, "talent {spell_id} rank count");
+            return ladder.clone();
+        }
+    }
+    Ladder::talent(spell_id, max_ranks)
+}
+
+/// Every rank of Slam, whose cooldown the notes of 2 November cut from 18 to 15 sec.
+pub(crate) const SLAM_RANKS: [i32; 5] = [1240193, 1464, 8820, 11604, 11605];
 
 fn build() -> HashMap<i32, &'static Spell> {
     let mut rows: HashMap<i32, Spell> = HashMap::new();
@@ -118,6 +244,42 @@ fn build() -> HashMap<i32, &'static Spell> {
         patch(id, &|row| row.category = FIRE_TRAP_CATEGORY);
     }
 
+    // Hunter (live hotfix cache of 3 November, development notes of 2 November): every rank of
+    // Aimed Shot (about 110% more bonus damage), Arcane Shot (about 30% more), Serpent Sting
+    // (about 20% more a tick), Sniper Shot (twice the bonus damage) and Aspect of the Hawk ranks
+    // 1 to 6. The old values are 70707's, which the frozen data shares for these rows.
+    for (spell, id, points) in HUNTER_SHOTS_20261103 {
+        patch(spell, &|row| effect(row, id).base_points = points);
+    }
+
+    // Druid (development notes of 2 November): Starfire's base damage "increased by about 40%".
+    // No row states the new values yet, so every rank's damage (base points and points per
+    // level) is scaled by [`STARFIRE_NOTES_SCALE`], a placeholder until the client carries them.
+    for id in STARFIRE_RANKS {
+        patch(id, &|row| {
+            let damage = &mut row.effects[0];
+            damage.base_points *= STARFIRE_NOTES_SCALE;
+            damage.ppl *= STARFIRE_NOTES_SCALE;
+        });
+    }
+
+    // Warrior (notes of 2 November): Defensive Stance's threat bonus 30% to 80% (Defensive Stance
+    // Passive, SpellEffect 686475), and Slam's 18 sec cooldown to 15 on every rank.
+    patch(7376, &|row| effect(row, 686475).base_points = 80.0);
+    for id in SLAM_RANKS {
+        patch(id, &|row| row.category_cooldown_ms = 15000);
+    }
+    // Warlock (notes of 2 November): Wrack's spell damage coefficient doubles (0.143 to 0.286
+    // a tick, "0.286 per second of cast time") and its base damage a second grows 2.5 a level,
+    // from 36 at its level 40 to 86 at 60 (was 36 at every level).
+    patch(1316697, &|row| {
+        let tick = effect(row, 1349556);
+        tick.ppl = 2.5;
+        tick.sp_coef *= 2.0;
+    });
+    // Shaman (notes of 2 November): Stormstrike's cooldown 8 sec to 6.
+    patch(17364, &|row| row.cooldown_ms = 6000);
+
     rows.into_iter()
         .map(|(id, row)| (id, &*Box::leak(Box::new(row))))
         .collect()
@@ -150,6 +312,28 @@ mod tests {
         assert_eq!(primal_bite.spell_level, 60);
         assert_eq!(hotfixed(1322605).unwrap().cooldown_ms, 8000);
         assert!(hotfixed(25306).is_none());
+        for (spell, id, points) in HUNTER_SHOTS_20261103 {
+            let row = hotfixed(spell).unwrap();
+            let effect = row.effects.iter().find(|effect| effect.id == id).unwrap();
+            assert_eq!(effect.base_points, points, "spell {spell}");
+        }
+        let wrack = row(Rules::Forever, 1316697);
+        assert_eq!(wrack.effects[0].average(60), 86.0);
+        assert_eq!(must_find(1316697).effects[0].average(60), 36.0);
+        assert!((wrack.effects[0].sp_coef - 0.286).abs() < 1e-6);
+        let stance = hotfixed(7376).unwrap();
+        let threat = stance
+            .effects
+            .iter()
+            .find(|effect| effect.id == 686475)
+            .unwrap();
+        assert_eq!(threat.base_points, 80.0);
+        for id in SLAM_RANKS {
+            assert_eq!(hotfixed(id).unwrap().category_cooldown_ms, 15000);
+        }
+        assert_eq!(hotfixed(17364).unwrap().cooldown_ms, 6000);
+        let starfire = hotfixed(9876).unwrap();
+        assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
     }
 
     #[test]

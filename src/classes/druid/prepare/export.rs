@@ -25,8 +25,8 @@ use crate::prepare::spell::{DefenseType, SpellFlag, GCD_DEFAULT};
 use crate::prepare::spelldata::{Ladder, Spell as Row};
 
 use super::forms::{
-    bear_weapon, cat_weapon, form_names, spell_position, weapon_from_main_hand,
-    ANIMAL_SPIRIT_REGEN_SUPPRESSION, BEAR_FORM_THREAT_MULTIPLIER, CAT_FORM_THREAT_MULTIPLIER,
+    bear_form_threat_multiplier, bear_weapon, cat_weapon, form_names, spell_position,
+    weapon_from_main_hand, ANIMAL_SPIRIT_REGEN_SUPPRESSION, CAT_FORM_THREAT_MULTIPLIER,
 };
 use super::{masks, Druid};
 
@@ -492,7 +492,10 @@ impl Druid {
             let rank = ladder.highest();
             let mut effect = json!({
                 "kind": "ferocious_bite", "spell": spell_position(sim, unit, bite),
-                "damage_per_energy": ladder.effect_at(2).fraction_at(rank.rank_number()),
+                // The spell's damage multiplier carries the notes' 25% (`bleed_and_bite_scale`);
+                // the extra energy's damage stays, as in wowsims/forever #823.
+                "damage_per_energy": ladder.effect_at(2).fraction_at(rank.rank_number())
+                    / super::feral::bleed_and_bite_scale(sim.rules),
                 "damage_per_combo_point": f64::from(rank.damage_effect().points_per_resource),
                 "attack_power_per_combo_point": 0.03,
             });
@@ -582,7 +585,7 @@ impl Druid {
                 .collect();
             effects.push(json!({
                 "kind": "rend_and_tear",
-                "multiplier": Ladder::talent(1223246, 5).effect_at(1).multiplier_at(self.tal.rend_and_tear),
+                "multiplier": super::feral::rend_and_tear_multiplier(sim.rules, self.tal.rend_and_tear),
                 "spells": special, "bleed_spells": bleeds,
             }));
         }
@@ -610,8 +613,8 @@ impl Druid {
                 "spell": spell_position(sim, unit, bear_form),
                 "health_bonus": self.bear_form_health_bonus(env, notes),
                 "initial_threat_multiplier":
-                    self.form_start_threat(sim, unit, "Bear Form", BEAR_FORM_THREAT_MULTIPLIER),
-                "threat_multiplier": BEAR_FORM_THREAT_MULTIPLIER,
+                    self.form_start_threat(sim, unit, "Bear Form", bear_form_threat_multiplier(sim.rules)),
+                "threat_multiplier": bear_form_threat_multiplier(sim.rules),
                 "initial_spirit_regen_multiplier": initial.spirit_regen_multiplier,
                 "spirit_regen_multiplier": ANIMAL_SPIRIT_REGEN_SUPPRESSION,
                 "furor_proc_chance": self.furor_proc_chance,

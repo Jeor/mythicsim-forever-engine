@@ -6,6 +6,8 @@
 
 use std::sync::OnceLock;
 
+use crate::Rules;
+
 use crate::contracts::prepared_v2::ActionId;
 use crate::prepare::sim::{
     AuraConfig, Cooldown, Duration, EventCallbacks, Sim, UnitId, UnitType, MILLISECOND,
@@ -504,7 +506,14 @@ impl Shaman {
 
     /// Go `registerStormstrikeSpell`: the two hits, the debuff on every enemy, then the cast.
     pub(super) fn register_stormstrike_spell(&self, sim: &mut Sim, unit: UnitId) {
-        let rank = spell_data().stormstrike.highest();
+        // The 8 sec cooldown is 6 under Forever's rules since the notes of 2 November 2026, and
+        // each hit deals 150% weapon damage (was 100%).
+        let rank =
+            crate::prepare::hotfix_113554::row(sim.rules, spell_data().stormstrike.highest().id);
+        let strike_multiplier = match sim.rules {
+            Rules::Forever => 1.5,
+            Rules::GoReference => 1.0,
+        };
         for is_mh in [true, false] {
             sim.register_spell(
                 unit,
@@ -520,7 +529,7 @@ impl Shaman {
                     flags: SpellFlag::MELEE_METRICS,
                     class_spell_mask: masks::STORMSTRIKE_DAMAGE,
                     threat_multiplier: 1.0,
-                    damage_multiplier: 1.0,
+                    damage_multiplier: strike_multiplier,
                     ..SpellConfig::default()
                 },
             );
