@@ -6,6 +6,7 @@ mod export;
 mod heals;
 mod imbues;
 pub(crate) mod items;
+pub(crate) mod layout;
 pub(crate) mod masks;
 mod shields;
 mod spell_data;
@@ -21,6 +22,7 @@ use crate::prepare::env::Environment;
 use crate::prepare::sim::{AuraId, Rules, Sim, SpellId, StateSlot, UnitId};
 use crate::prepare::spell::ProcMask;
 use crate::prepare::stats::Stat;
+use crate::prepare::talent_layout;
 use crate::prepare::Refusal;
 
 use spell_data::spell_data;
@@ -262,11 +264,22 @@ pub(crate) fn new_shaman(
         self_buffs.imbue_oh_swap = "NoImbue".to_string();
     }
 
-    let talents = fill_talents(
-        "proto.ShamanTalents",
-        player.str("talents_string"),
-        TALENT_TREE_SIZES,
-    )
+    // Forever's rules read the client's own order, in which Improved Ghost Wolf moved from the
+    // second row to the fourth: an old Enhancement string that puts too many points in a talent of
+    // the new order is refused with the reason. The reference keeps the proto's order.
+    let talents_string = player.str("talents_string");
+    let talents = match sim.rules {
+        Rules::Forever => talent_layout::fill(
+            "proto.ShamanTalents",
+            "shaman",
+            talents_string,
+            &layout::FOREVER_TREES,
+        )
+        .map(|(talents, _)| talents),
+        Rules::GoReference => {
+            fill_talents("proto.ShamanTalents", talents_string, TALENT_TREE_SIZES)
+        }
+    }
     .map_err(|err| Refusal::new("talents", err))?;
 
     // Go NewShaman.

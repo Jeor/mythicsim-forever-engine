@@ -1000,6 +1000,19 @@ impl Agent for MageAgent {
         }
     }
 
+    /// Go `OnApplyEffects`, before the cast's effects: Forever's rules spend Clearcasting here.
+    fn on_apply_effects(
+        fight: &mut Fight<Self>,
+        _aura: AuraRef,
+        kind: MageAura,
+        spell: SpellId,
+        _target: Side,
+    ) {
+        if kind == MageAura::Clearcasting {
+            Self::arcane_concentration(fight).on_apply_effects(fight, spell);
+        }
+    }
+
     fn on_cast_complete(fight: &mut Fight<Self>, aura: AuraRef, kind: MageAura, spell: SpellId) {
         match kind {
             MageAura::FingersOfFrost

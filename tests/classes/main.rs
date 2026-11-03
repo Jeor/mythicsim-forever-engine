@@ -19,6 +19,8 @@ mod rogue;
 mod rotation_targets;
 mod rotation_values;
 mod shaman;
+#[path = "../support/shaman_layout.rs"]
+mod shaman_layout;
 mod warlock;
 mod warrior;
 mod weapon_procs;

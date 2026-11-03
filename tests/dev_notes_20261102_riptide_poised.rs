@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::{fs, path::Path};
 
 const RIPTIDE_RANKS: [(i64, i64, i64); 3] =
-    [(408521, 147, 245), (1239242, 180, 300), (1239243, 231, 385)];
+    [(408521, 245, 245), (1239242, 300, 300), (1239243, 230, 385)];
 const RIPTIDE: i64 = 1239243;
 /// The provisional spell id of the Druid's Poised (`prepare::feral`), which no client row states.
 const POISED: i64 = 1_399_003;
@@ -111,8 +111,10 @@ fn sum(result: &Value, key: &str) -> f64 {
         .sum()
 }
 
-/// Riptide costs about 40% less mana, waits 12 sec (was 6) and has no initial heal: its heal row
-/// carries only the heal over time, and the Go reference keeps the whole frozen spell.
+/// Riptide costs what Wowhead's tooltips state on 4 November (245, 300 and 230 mana: rank 3 is
+/// the notes' "about 40%" less, ranks 1 and 2 read their old costs), waits 12 sec (was 6) and has
+/// no initial heal: its heal row carries only the heal over time (89, 115 and 161 every 3 sec,
+/// which Wowhead's buff tooltips state too), and the Go reference keeps the whole frozen spell.
 #[test]
 fn riptide_is_a_cheaper_slower_heal_over_time() {
     let request = riptide_request();
@@ -146,6 +148,19 @@ fn riptide_is_a_cheaper_slower_heal_over_time() {
         .find(|heal| heal["spell_id"] == 10623)
         .map(|heal| heal["hot_bonus"]["multiplier"].clone());
     assert_eq!(chain, Some(json!(1.25)));
+    // Every rank's heal over time is the row's: Wowhead's buff tooltips read "Heals 89 every 3
+    // sec", 115, and 191 at rank 3's max level 68 (161 at level 60, plus 8 levels of 3.7).
+    for (id, tick) in [(408521i64, 89.0), (1239242, 115.0), (RIPTIDE, 161.0)] {
+        let rank = effect(&forever, "heals")["heals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|heal| heal["spell_id"] == id)
+            .unwrap()
+            .clone();
+        assert_eq!(rank["tick"], tick, "{id}");
+        assert!(rank["direct"].is_null(), "{id}");
+    }
 }
 
 /// In the fights: a Riptide rotation casts half as often, and what it heals is its ticks alone,

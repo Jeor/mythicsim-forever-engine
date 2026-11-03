@@ -56,8 +56,9 @@ fn effect_kinds(prepared: &Value) -> Vec<String> {
         .collect()
 }
 
-/// Lightning Bolt's base damage on every rank, each roughly 78% of the Classic Era rank (the
-/// maximum rank 200 to 360, "increased by 80%").
+/// Lightning Bolt's base damage on every rank, as Wowhead's Forever tooltips state the rows on 4
+/// November 2026 (the notes: roughly 78% of the Classic Era rank, the maximum rank "increased by
+/// 80%"): rank 10 is 353 base and 2.1 a level, 361 at level 60 (was 200).
 #[test]
 fn lightning_bolt_by_rank() {
     let request = request("production-elemental-shaman");
@@ -65,7 +66,7 @@ fn lightning_bolt_by_rank() {
     let reference = prepared(&request, Rules::GoReference);
     let ids = [403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208i64];
     let new = [
-        12.0, 24.0, 42.0, 75.0, 111.0, 153.0, 199.0, 246.0, 300.0, 360.0,
+        16.0, 30.0, 53.0, 75.0, 112.0, 153.0, 199.0, 247.0, 303.0, 361.0,
     ];
     let old = [
         15.0, 27.0, 46.0, 63.0, 84.0, 115.0, 151.0, 167.0, 183.0, 200.0,
@@ -76,8 +77,8 @@ fn lightning_bolt_by_rank() {
         assert_eq!(forever_bolts[rank], (*id, new[rank]), "rank {}", rank + 1);
         assert_eq!(reference_bolts[rank], (*id, old[rank]), "rank {}", rank + 1);
     }
-    // The maximum rank is exactly 1.8 times what it was, so both ends of its roll are too: the
-    // row's variance is a share of the average and does not change.
+    // The row's variance is a share of the average and does not change, so the roll of rank 10
+    // spans 361 times 0.946 to 1.054 (Wowhead's tooltip, at its max level, reads 344 to 383).
     let roll = |prepared: &Value| {
         let spell = spells(prepared, "lightning_bolt")[9];
         let damage = &spell["damage_effect"];
@@ -92,11 +93,17 @@ fn lightning_bolt_by_rank() {
     };
     let (new_min, new_max) = roll(&forever);
     let (old_min, old_max) = roll(&reference);
-    assert!((new_min - 1.8 * old_min).abs() < 1e-9);
-    assert!((new_max - 1.8 * old_max).abs() < 1e-9);
-    // The overload copy deals half of its rank.
+    assert!((new_min / old_min - 361.0 / 200.0).abs() < 1e-9);
+    assert!((new_max / old_max - 361.0 / 200.0).abs() < 1e-9);
+    // The overload copy deals half of its rank: Lightning Overload's text says "half damage".
     let overloads = averages(&forever, "lightning_bolt_overload");
     assert_eq!(overloads[9], (15208, 180.0));
+    for (rank, half) in [8.0, 15.0, 26.0, 37.0, 56.0, 76.0, 99.0, 123.0, 151.0, 180.0]
+        .into_iter()
+        .enumerate()
+    {
+        assert_eq!(overloads[rank].1, half, "overload of rank {}", rank + 1);
+    }
     assert_eq!(
         averages(&reference, "lightning_bolt_overload")[9],
         (15208, 100.0)
@@ -108,8 +115,10 @@ fn lightning_bolt_by_rank() {
     );
 }
 
-/// Chain Lightning's cast time (2.5 sec, was 2), primary target damage (about 145% of the
-/// comparable Lightning Bolt rank) and mana cost (about 225%), by rank.
+/// Chain Lightning's cast time (2.5 sec, was 2) and mana cost (about 225% of the comparable
+/// Lightning Bolt rank), which the notes state and Wowhead's tooltips still state as 2 sec and
+/// 145, 200, 250 and 315 mana, and its primary target damage as Wowhead states the rows on 4
+/// November 2026: rank 4 is 510 base and 3.3 a level, 523 at level 60 (was 126).
 #[test]
 fn chain_lightning_by_rank() {
     let request = request("production-elemental-shaman");
@@ -118,7 +127,7 @@ fn chain_lightning_by_rank() {
 
     assert_eq!(
         averages(&forever, "chain_lightning"),
-        [(421, 222.0), (930, 289.0), (2860, 435.0), (10605, 522.0)]
+        [(421, 222.0), (930, 359.0), (2860, 441.0), (10605, 523.0)]
     );
     assert_eq!(
         averages(&reference, "chain_lightning"),
@@ -126,7 +135,7 @@ fn chain_lightning_by_rank() {
     );
     assert_eq!(
         averages(&forever, "chain_lightning_overload"),
-        [(421, 111.0), (930, 145.0), (2860, 218.0), (10605, 261.0)]
+        [(421, 111.0), (930, 179.0), (2860, 220.0), (10605, 261.0)]
     );
     assert_eq!(
         base_costs(&forever, "chain_lightning"),
@@ -152,22 +161,20 @@ fn chain_lightning_by_rank() {
         assert_eq!(spell["bonus_coefficient"], 0.357);
     }
 
-    // The ratios to the comparable Lightning Bolt ranks 6, 7, 9 and 10, which level scaling and
-    // the whole-number damage keep within a few percent of the notes' 145% and 225%.
-    let bolts = averages(&forever, "lightning_bolt");
+    // Mana is about 225% of the comparable Lightning Bolt ranks 6, 7, 9 and 10, which the notes
+    // state. Damage is no longer a share of Lightning Bolt's: Wowhead's rows put rank 2 well above
+    // 145% (348 base against the 189 the notes' ratio gave).
     let bolt_costs = base_costs(&forever, "lightning_bolt");
-    let chains = averages(&forever, "chain_lightning");
     let chain_costs = base_costs(&forever, "chain_lightning");
     for (chain, bolt) in [0, 1, 2, 3].into_iter().zip([5, 6, 8, 9]) {
-        let damage = chains[chain].1 / bolts[bolt].1;
-        assert!((damage - 1.45).abs() < 0.05, "damage {damage}");
         let mana = chain_costs[chain] / bolt_costs[bolt];
         assert!((mana - 2.25).abs() < 0.01, "mana {mana}");
     }
 }
 
-/// The shocks at Classic Era values: Earth Shock rank 7 517 to 545 (301 before), Flame Shock rank 6
-/// 292 and 320 over 12 sec (166 and 176), Frost Shock rank 4 492 to 520 (286 before).
+/// The shocks at Classic Era values, as Wowhead's Forever tooltips state the rows on 4 November
+/// 2026: Earth Shock rank 7 531 base (301 before), Flame Shock rank 6 292 and 320 over 12 sec
+/// (166 and 176), Frost Shock rank 4 506 base (283 before).
 #[test]
 fn shocks_are_classic_era() {
     let request = request("production-elemental-shaman");

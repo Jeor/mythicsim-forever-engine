@@ -381,29 +381,36 @@ the Go goldens and exporter uses. The departures:
   Chain Lightning, the shocks and Lava Burst are in the next bullet). `tools/dev_notes_check.py`
   checks every number of these bullets against a live client spell store.
 - The rest of the Shaman changes in the development notes of 2 November 2026 (Forever
-  preparation, from the notes' ratios; the client has no rows for them yet, and the reference
-  keeps the frozen rows; the rows are in `prepare::hotfix_113554`). Lightning Bolt: ranks 1 to 9
-  take "roughly 78%" of their Classic Era rank (Wowhead's Classic tooltips averaged at level 60),
-  and rank 10, which the notes "increased by 80%", is exactly 1.8 times what it was at level 60
-  (200 to 360, so the minimum and maximum of its roll are each 1.8 times theirs: base 355.5, was
-  196). That is 79.6% of Classic's 452.5, so the two statements agree to within a point and a
-  half; at 78% of Classic the rank would be 353 base. Ranks 1 to 3 come out below their beta
-  numbers (12, 24 and 41 against 15, 27 and 45), which the notes' "all ranks increased"
-  contradicts; they follow the 78% and no level 60 Shaman casts them. Chain Lightning: a 2.5 sec
-  cast (was 2), primary target damage 145% of the comparable Lightning Bolt rank's level 60
-  damage (222, 289, 435 and 522 against Lightning Bolt ranks 6, 7, 9 and 10, the nearest by the
-  level each is learnt), mana 225% of the same ranks' (248, 304, 428 and 495, was 145, 200, 250
-  and 315) and the 2.5 sec coefficient 0.714 (was 0.571). Lightning Overload's copies keep dealing
-  half their rank. Shocks: Classic Era's numbers at level 60, so Earth Shock rank 7 531 (was
-  301), Flame Shock rank 6 292 and 80 a tick (was 166 and 44) and Frost Shock rank 4 509 (was
-  286; Classic's is 506), the derivation of wowsims/forever #821's preview store. Lava Burst is
-  removed: its talent slot (position 13 of the Elemental tree, so saved talent strings keep their
-  positions) gives Call of Thunder, +5% critical strike chance for Lightning Bolt, Chain
-  Lightning and their Lightning Overload copies, and no Lava Burst spell is registered, so a
-  rotation line naming it finds no spell and is dropped, as an unknown spell is. Elemental
-  Mastery's aura reads Lightning Mastery (the name only). Not modelled: the Windfury animations,
-  Totemic Call and Elemental Reach's cooldown. Riptide is in the last bullet of these notes. `tools/dev_notes_check.py`
-  lists each row.
+  preparation, the reference keeps the frozen rows; the rows are in `prepare::hotfix_113554`).
+  The damage rows are Wowhead's Forever tooltips of 4 November 2026 (the live client's, rows the
+  launch build encrypts included; each tooltip carries its row as `ppl<level>:<max level>:<base>:
+  <points per level x 100>`), which replaced the first pass's derivation of the notes' ratios.
+  Lightning Bolt: base 16, 30, 52, 73, 109, 148, 194, 240, 295 and 353 for ranks 1 to 10 (rank 10
+  was 196) and 0.1 to 2.1 a level (rank 10: 2.1, was 1.2), so 361 at level 60 (was 200). Chain
+  Lightning's primary target damage: base 215, 348, 428 and 510 (rank 4 was 123) and 1.4, 2.2, 2.7
+  and 3.3 a level, so 523 at level 60 (was 126). The shocks are Classic Era's: Earth Shock rank 7
+  531 (was 301), Flame Shock rank 6 292 and 80 a tick (was 166 and 44) and Frost Shock rank 4 506
+  base, 509 at level 60 (was 283 and 286). Chain Lightning's other changes are the notes' alone,
+  since Wowhead's tooltips still state the old fields (2 sec, 145, 200, 250 and 315 mana, a 6 sec
+  cooldown, which the notes leave): a 2.5 sec cast (was 2) and mana 225% of the comparable
+  Lightning Bolt ranks' (248, 304, 428 and 495), with the coefficient 0.714 (was 0.571), which
+  Wowhead's spell pages state on all four ranks. Lightning Overload's copies deal half their
+  rank's base and level scaling, since the talent's text says "half damage" ("a second, similar
+  spell on the same target at no additional cost that causes half damage and no threat"), where
+  Wowhead's tooltips of the copy rows still state the old rows on every rank (rank 10 Lightning
+  Bolt 98, rank 4 Chain Lightning 62) while every primary row moved: the top ranks deal 180 and 261
+  at level 60, what they dealt before, and the lower ranks follow their new primaries. Lava Burst
+  is removed: its talent slot (position 13 of the Elemental tree,
+  so saved talent strings keep their positions) gives Call of Thunder, +5% critical strike chance
+  for Lightning Bolt, Chain Lightning and their Lightning Overload copies (Wowhead's talent text
+  names the two spells), and no Lava Burst spell is registered, so a rotation line naming it finds
+  no spell and is dropped, as an unknown spell is. Elemental Mastery's aura reads Lightning
+  Mastery (the name only). Chain Lightning applies its jump reduction to the second and third
+  target only: the primary hit is the full row (checked against a combat log, first target 1.19
+  times Lightning Bolt's with the same coefficient and gear); a report of it hitting for less
+  than Lightning Bolt compares the average of all three hits with Lightning Bolt's. Not modelled:
+  the Windfury animations, Totemic Call and Elemental Reach's cooldown. Riptide is in the last
+  bullet of these notes. `tools/dev_notes_check.py` lists each row.
 - The same notes for Rogue, the changes that do not depend on the new talent trees (Forever
   preparation, from the notes alone; the rows are in `prepare::hotfix_113554`, the reference keeps
   the frozen data). Instant Poison takes 1% of attack power (was 0.5%) and Deadly Poison 0.9% a
@@ -435,10 +442,12 @@ the Go goldens and exporter uses. The departures:
   moves. `tools/dev_notes_check.py` checks the rows of the Rogue part too.
 - Riptide and the Druid's Poised, the last numbers of the same notes the client does not state yet
   (Forever preparation, the reference keeps the frozen rows; `prepare::hotfix_113554`). Riptide
-  costs "about 40%" less mana (147, 180 and 231 for its three ranks, each 60% of the 245, 300 and
-  385 rounded down), has a 12 sec cooldown (was 6) and "no initial heal, only the heal over time":
-  its heal effect is turned into an inert dummy so the heal over time (161 a tick at rank 3, five
-  ticks over its 15 sec) and the 25% Chain Heal bonus on the holder keep their effects. Only the
+  costs what Wowhead's tooltips of 4 November 2026 state: 245, 300 and 230 mana for its three
+  ranks (385 before for rank 3, the notes' "about 40%" less; ranks 1 and 2 read their old costs
+  there), has a 12 sec cooldown (the notes; was 6 and Wowhead states 12 on all three) and "no
+  initial heal, only the heal over time": its heal effect is turned into an inert dummy so the
+  heal over time (89, 115 and 161 a tick, the rows Wowhead's buff tooltips state too, five ticks
+  over its 15 sec) and the 25% Chain Heal bonus on the holder keep their effects. Only the
   Restoration shaman's healer sims read it. A rotation that casts Riptide on its cooldown keeps it
   on its target (15 sec outlasts the 12 sec cooldown), so the preset needs no edit for the
   cooldown, though each cast now heals only its ticks. Poised for Druids (learned at level 32;
@@ -478,6 +487,28 @@ the Go goldens and exporter uses. The departures:
   notes do not say a tick can crit, and only area rotations cast it); Gore Drinker (not
   modelled); and the end of the low rank proc penalty (the engine casts level 60 ranks and never
   applied one).
+- The launch client's Shaman Enhancement tree, Holy Shield's fourth rank, the Orc racial Command
+  and the Mage's Clearcasting (the notes of 2 November 2026 and the live data of 4 November,
+  Forever preparation; the reference keeps its own order and rows). The Shaman reads talent
+  strings in the client's order (`prepare::talent_layout`, as the Druid, Hunter and Mage do), in
+  which Wowhead's talent calculator moves Improved Ghost Wolf from the second row's last square
+  to the fourth row's last, after Stormstrike, so the seven talents between it and its old place
+  shift one square earlier; Elemental (Call of Thunder in Lava Burst's square, Lightning Mastery
+  in Elemental Mastery's) and Restoration keep their positions. A string written in the old
+  order reads wrongly when it fits the new ranks, so the app has to re-encode its saved
+  Enhancement builds (the engine refuses only those that put more points in a talent than it has
+  ranks, such as three in Shamanistic Focus, naming it). Holy Shield has a fourth rank
+  (1239570, learned at 60, 240 mana, 221 damage and 30% block, the row build 70755 completes):
+  a rotation that names it casts it, and one that names rank 3 (20928, 195 mana and 153 damage
+  since push 113554) still casts rank 3. Command (20575) now has two effects on Wowhead's spell
+  page: all effects of the Tamed Pet Passive +5% (the Hunter's pet, kept as the 5% on its
+  damage) and "Modifies Damage/Healing Done" +5% on Firebolt and Lash of Pain alone, so an Orc
+  Warlock's Imp and Succubus gain 5% on those two spells, added to their other damage
+  modifiers, and its other demons nothing (it was 5% on every pet's damage). Clearcasting is
+  spent as the cast's effects apply rather than as it completes (wowsims/forever #831): an Arcane
+  Missiles cast Missile Barrage pays for leaves it standing, and the check at completion found
+  Missile Barrage already spent whenever it had been gained before the Clearcasting, which
+  was 23 of 68 such casts in sixty seeded fights on the Arcane board.
 - A damage bonus applied after the calculation is threat too (`threat_follows_damage_bonus`,
   Forever preparation), from MythicSim's Discord (26 October 2026, Vrelk: a Shadow Priest with
   no threat talents had less threat than damage). Improved Mind Flay's ramp, Ice Lance on a

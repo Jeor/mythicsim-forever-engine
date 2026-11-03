@@ -6,6 +6,9 @@ use forever_engine::{prepare_json_with, Rules};
 use serde_json::Value;
 use std::{fs, path::Path};
 
+#[path = "support/shaman_layout.rs"]
+mod shaman_layout;
+
 fn request(name: &str) -> Value {
     let path = Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -205,7 +208,10 @@ fn lightning_overload_is_thirty_percent() {
 #[test]
 fn enhancement_talents_and_stormstrike() {
     let request = request("production-enhancement-shaman");
-    let forever = prepared(&request, Rules::Forever);
+    // The fixture's talents in the launch client's order, which Forever's rules read.
+    let mut forever_request = request.clone();
+    shaman_layout::forever_request(&mut forever_request);
+    let forever = prepared(&forever_request, Rules::Forever);
     let reference = prepared(&request, Rules::GoReference);
     for (prepared, multiplier, cooldown) in [
         (&forever, 1.5, 6_000_000_000i64),

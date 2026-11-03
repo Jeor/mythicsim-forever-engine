@@ -143,9 +143,16 @@ fn arcane_concentration_flag_is_forever_only() {
         .is_none());
 }
 
-/// The first iteration's log lines of the Arcane board, a fight of five minutes.
+/// The first iteration's log lines of the Arcane board, a fight of two minutes.
 fn arcane_log() -> Vec<String> {
+    arcane_log_with_seed(None)
+}
+
+fn arcane_log_with_seed(seed: Option<u64>) -> Vec<String> {
     let mut request = request(ARCANE_BOARD, "arcane-mage");
+    if let Some(seed) = seed {
+        request["simOptions"]["randomSeed"] = seed.to_string().into();
+    }
     request["simOptions"]["debugFirstIteration"] = true.into();
     request["simOptions"]["iterations"] = 1.into();
     request["encounter"]["duration"] = 120.into();
@@ -180,48 +187,51 @@ fn arcane_missiles_proc_clearcasting() {
     assert!(procs > 0, "no missile proc Clearcasting");
 }
 
-/// An Arcane Missiles cast that finds Clearcasting from an earlier moment and Missile Barrage up
-/// does not spend the Clearcasting (it fades at its own end, 1.5 sec after the last gain).
+/// Clearcasting survives an Arcane Missiles cast that Missile Barrage pays for in whichever order
+/// the two auras were gained. A cast's callbacks run in the order their auras were last activated,
+/// so a Clearcasting that checks Missile Barrage as the cast completes finds it spent whenever
+/// Missile Barrage came first (wowsims/forever #831 spends it as the cast's effects apply). Forty
+/// seeded fights: the reference-order check lost the Clearcasting on 23 of 68 such casts in
+/// sixty.
 #[test]
-fn clearcasting_survives_missile_barrage_missiles() {
-    const MISSILES_RANK_7: &str = "Casting {SpellID: 10212}";
+fn clearcasting_survives_missile_barrage_in_either_order() {
+    const MISSILES: &str = "Completed cast {SpellID: 10212}";
     const MISSILE_BARRAGE: &str = "SpellID: 44404";
-    let lines = arcane_log();
-    let (mut clearcasting_since, mut clearcasting_until, mut barrage) = (None, 0.0, false);
-    let mut kept = 0;
-    for (i, line) in lines.iter().enumerate() {
-        let now = time(line);
-        if line.contains(CLEARCASTING) {
-            if line.contains("Aura gained") {
-                clearcasting_since = Some(now);
+    let (mut both_up, mut barrage_first) = (0, 0);
+    for seed in 1..=40u64 {
+        let lines = arcane_log_with_seed(Some(seed));
+        let (mut clearcasting, mut barrage) = (None::<usize>, None::<usize>);
+        for (i, line) in lines.iter().enumerate() {
+            let gained = line.contains("Aura gained");
+            let faded = line.contains("Aura faded");
+            if line.contains(CLEARCASTING) && !line.contains("Aura refreshed") {
+                clearcasting = gained.then_some(i).or(clearcasting.filter(|_| !faded));
             }
-            if line.contains("Aura gained") || line.contains("Aura refreshed") {
-                clearcasting_until = now + 1.5;
+            if line.contains(MISSILE_BARRAGE) && !line.contains("Aura refreshed") {
+                barrage = gained.then_some(i).or(barrage.filter(|_| !faded));
             }
-            if line.contains("Aura faded") {
-                clearcasting_since = None;
+            if !line.contains(MISSILES) {
+                continue;
             }
-        }
-        if line.contains(MISSILE_BARRAGE) {
-            if line.contains("Aura gained") || line.contains("Aura refreshed") {
-                barrage = true;
-            }
-            if line.contains("Aura faded") {
-                barrage = false;
-            }
-        }
-        if !line.contains(MISSILES_RANK_7) {
-            continue;
-        }
-        let older = clearcasting_since.is_some_and(|since| since < now);
-        if older && barrage && clearcasting_until > now + 1e-9 {
+            let (Some(clearcasting_at), Some(barrage_at)) = (clearcasting, barrage) else {
+                continue;
+            };
+            let now = time(line);
             let spent = lines[i + 1..]
                 .iter()
                 .take_while(|next| time(next) == now)
                 .any(|next| next.contains(CLEARCASTING) && next.contains("Aura faded"));
-            assert!(!spent, "Clearcasting spent by the cast at {now}");
-            kept += 1;
+            assert!(
+                !spent,
+                "seed {seed}: Clearcasting spent by the Missile Barrage cast at {now}"
+            );
+            both_up += 1;
+            barrage_first += usize::from(barrage_at < clearcasting_at);
         }
     }
-    assert!(kept > 0, "no cast with Clearcasting and Missile Barrage up");
+    assert!(both_up > 20, "only {both_up} casts with both auras up");
+    assert!(
+        barrage_first > 5,
+        "only {barrage_first} had Missile Barrage first"
+    );
 }

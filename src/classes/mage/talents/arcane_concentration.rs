@@ -52,11 +52,25 @@ impl ArcaneConcentration {
         fight.player.spell_cost_percent_modifier += 100;
     }
 
-    /// Clearcasting OnCastComplete. A Clearcasting gained in this timestep belongs to the
-    /// next cast; any other costed Mage cast consumes it. An Arcane Missiles cast with Missile
-    /// Barrage up does not, under Forever's rules: Missile Barrage's own callback, which runs
-    /// after this one, spends that cast's free pass.
+    /// Clearcasting OnCastComplete, which the reference spends it in (Forever's rules spend it in
+    /// [`Self::on_apply_effects`] instead).
     pub(crate) fn on_cast_complete<A: Agent>(&self, fight: &mut Fight<A>, spell: SpellId) {
+        self.spend(fight, spell);
+    }
+
+    /// Clearcasting OnApplyEffects, under Forever's rules (wowsims/forever #831): the cast's
+    /// effects have not applied yet, so Missile Barrage is still up on the Arcane Missiles cast it
+    /// pays for. Spent at the end of the cast, the check found it already gone whenever Missile
+    /// Barrage was gained before the Clearcasting, because a cast's callbacks run in the order the
+    /// auras were last activated (a quarter of the casts in the Arcane board's fights).
+    pub(crate) fn on_apply_effects<A: Agent>(&self, fight: &mut Fight<A>, spell: SpellId) {
+        self.spend(fight, spell);
+    }
+
+    /// A Clearcasting gained in this timestep belongs to the next cast; any other costed Mage cast
+    /// consumes it. An Arcane Missiles cast with Missile Barrage up does not, under Forever's
+    /// rules.
+    fn spend<A: Agent>(&self, fight: &mut Fight<A>, spell: SpellId) {
         let aura = fight.aura(self.clearcasting);
         if aura.remaining(fight.now) == aura.duration {
             return;

@@ -8,6 +8,8 @@ use std::{fs, path::Path};
 
 #[path = "support/paladin_113554.rs"]
 mod paladin_113554;
+#[path = "support/shaman_layout.rs"]
+mod shaman_layout;
 
 #[derive(Deserialize)]
 struct Manifest {
@@ -259,6 +261,8 @@ fn the_swap_weapons_stone_needs_an_item_swap() {
     let cases = manifest().cases;
     let case = cases.iter().find(|case| case.id == id).unwrap();
     let mut request: Value = serde_json::from_slice(&request_bytes(case)).unwrap();
+    // The Shaman's talents in the launch client's order, which Forever's rules read.
+    shaman_layout::forever_request(&mut request);
     request["raid"]["parties"][0]["players"][0]["consumables"]["mhImbueId"] = 18262.into();
     let stone = forever_engine::prepare_json(&serde_json::to_vec(&request).unwrap(), id)
         .unwrap_or_else(|err| panic!("{id} with a stone: {err}"));
