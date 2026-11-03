@@ -87,7 +87,32 @@ impl Item {
     }
 }
 
-pub(crate) type Equipment = [Item; NUM_ITEM_SLOTS];
+/// Equipment copies share item data until a swap or an imbue changes a slot.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Equipment(std::rc::Rc<[Item; NUM_ITEM_SLOTS]>);
+
+impl std::ops::Deref for Equipment {
+    type Target = [Item; NUM_ITEM_SLOTS];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Equipment {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        std::rc::Rc::make_mut(&mut self.0)
+    }
+}
+
+impl<'a> IntoIterator for &'a Equipment {
+    type Item = &'a Item;
+    type IntoIter = std::slice::Iter<'a, Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
 
 /// Go `EnchantFromProto`, by effect ID.
 pub(crate) fn enchant(effect_id: i32) -> Option<Enchant> {
@@ -391,4 +416,92 @@ pub(crate) fn equipment_stats(equipment: &Equipment) -> Stats {
 /// enchant effect carries at the base scaling, zero where the effect names none.
 pub(crate) fn effect_stats(effect: &Message) -> Stats {
     scaling_option(effect).map_or_else(Stats::default, |option| stats_from_map(option, "stats"))
+}
+
+#[cfg(test)]
+mod clone_tests {
+    use super::*;
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+
+    struct CountingAllocator;
+
+    thread_local! {
+        static ALLOCATIONS: Cell<Option<usize>> = const { Cell::new(None) };
+    }
+
+    fn count_allocation() {
+        let _ = ALLOCATIONS.try_with(|count| {
+            if let Some(value) = count.get() {
+                count.set(Some(value + 1));
+            }
+        });
+    }
+
+    // SAFETY: Every operation forwards the original pointer and layout to System.
+    // The counter uses allocation-free thread-local storage and does not touch allocations.
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            count_allocation();
+            // SAFETY: The caller supplies the layout required by GlobalAlloc.
+            unsafe { System.alloc(layout) }
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            // SAFETY: The allocation came from System with this same layout.
+            unsafe { System.dealloc(ptr, layout) }
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            count_allocation();
+            // SAFETY: The caller supplies the layout required by GlobalAlloc.
+            unsafe { System.alloc_zeroed(layout) }
+        }
+
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            count_allocation();
+            // SAFETY: The caller supplies a System allocation and valid replacement size.
+            unsafe { System.realloc(ptr, layout, size) }
+        }
+    }
+
+    #[global_allocator]
+    static ALLOCATOR: CountingAllocator = CountingAllocator;
+
+    #[test]
+    fn cloning_equipment_does_not_allocate() {
+        let mut equipment: Equipment = Default::default();
+        equipment[slot::MAIN_HAND].name = "Weapon".to_string();
+        equipment[slot::MAIN_HAND].enchant.name = "Enchant".to_string();
+        ALLOCATIONS.with(|count| count.set(Some(0)));
+        let copy = std::hint::black_box(&equipment).clone();
+        let allocations = ALLOCATIONS.with(|count| count.replace(None).unwrap());
+        assert_eq!(copy[slot::MAIN_HAND].name, "Weapon");
+        assert_eq!(
+            allocations, 0,
+            "equipment copies should share unchanged item data"
+        );
+    }
+    #[test]
+    fn equipment_copies_keep_slot_and_nested_mutations_independent() {
+        let mut original: Equipment = Default::default();
+        original[slot::MAIN_HAND].name = "Original".to_string();
+        original[slot::MAIN_HAND].enchant.name = "Original enchant".to_string();
+        original[slot::MAIN_HAND].pseudo_stats = vec![3.0];
+        let mut changed = original.clone();
+        changed[slot::MAIN_HAND].temp_enchant = 283;
+        changed[slot::MAIN_HAND].enchant.name.push_str(" changed");
+        changed[slot::MAIN_HAND].pseudo_stats[0] = 9.0;
+        changed[slot::OFF_HAND] = Item {
+            id: 123,
+            ..Item::default()
+        };
+        assert_eq!(original[slot::MAIN_HAND].temp_enchant, 0);
+        assert_eq!(original[slot::MAIN_HAND].enchant.name, "Original enchant");
+        assert_eq!(original[slot::MAIN_HAND].pseudo_stats, [3.0]);
+        assert_eq!(original[slot::OFF_HAND].id, 0);
+        original.iter_mut().for_each(|item| item.temp_enchant = 5);
+        assert_eq!(changed[slot::MAIN_HAND].temp_enchant, 283);
+        assert_eq!(changed[slot::OFF_HAND].id, 123);
+    }
 }
