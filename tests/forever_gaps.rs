@@ -1095,3 +1095,68 @@ fn fifteen_stat_aura_bits_run() {
         "{refused:?}"
     );
 }
+
+/// A Feral Bear Druid with Insect Swarm talented whose rotation never casts it (production sims
+/// 6558f1f1 and 33db8dfb, 2 November 2026): the debuff that lowers the target's chance to hit
+/// can never go up, so the target's swings stay as the reset has them. A rotation that casts
+/// Insect Swarm is still refused, since the runtime does not follow the debuff's change.
+#[test]
+fn an_uncast_insect_swarm_leaves_a_bears_target_alone() {
+    let (value, _) = run("feral-bear-druid-insect-swarm-unused");
+    assert!(kinds(&value).contains(&"insect_swarm"));
+    let cast = edited(
+        "feral-bear-druid-insect-swarm-unused",
+        &[(
+            r#""priorityList":["#,
+            r#""priorityList":[{"action":{"castSpell":{"spellId":{"spellId":24977}}}},"#,
+        )],
+    );
+    let prepared = prepare_json_with(cast.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    let prepared: PreparedV2 = serde_json::from_value(prepared).unwrap();
+    let refused = check_prepared(&prepared).unwrap_err();
+    assert!(
+        format!("{refused:?}").contains("Insect Swarm (Player) changes the target's swings"),
+        "{refused:?}"
+    );
+}
+
+/// A Feral Druid in Shadowcraft Armor (5) swapping onto the Manual Crowd Pummeler (production
+/// sim 695f1488, 2 November 2026): the set's energize rolls through a legacy PPM manager, which
+/// an item swap rebuilds for the weapons in the hands, as Lightforge Armor's.
+#[test]
+fn shadowcraft_armor_energizes_beside_a_swap() {
+    let (value, player) = run("feral-druid-swap-shadowcraft-armor");
+    assert!(kinds(&value).contains(&"item_swap"));
+    assert!(kinds(&value).contains(&"energize_proc"));
+    assert!(resource_gain(&player, 27787, "ResourceTypeEnergy") > 0.0);
+}
+
+/// Recklessness on an execute phase check without a threshold (production sim 484ad888,
+/// 2 November 2026): Go builds no value for the unset threshold, so the action has no
+/// condition, exactly as the same request without it.
+#[test]
+fn an_execute_phase_without_a_threshold_drops_out() {
+    let (_, player) = run("dps-warrior-execute-phase-unset");
+    assert!(action(&player, 1719, 0).0 > 0.0, "Recklessness casts");
+    let without = run_request(&edited(
+        "dps-warrior-execute-phase-unset",
+        &[(r#","condition":{"isExecutePhase":{}}"#, "")],
+    ));
+    assert_eq!(player["dps"], without["dps"]);
+}
+
+/// A Demonology Warlock reading its target's health percent (production sim e375ed8a,
+/// 2 November 2026): Go enables health bars only on the raid's characters and pets, so the
+/// value builds nothing and drops out of its `and`, exactly as the same request without it.
+#[test]
+fn a_targets_health_percent_drops_out() {
+    let (_, player) = run("demonology-warlock-target-health-percent");
+    let without = run_request(&edited(
+        "demonology-warlock-target-health-percent",
+        &[(
+            r#"{"cmp":{"lhs":{"currentHealthPercent":{"sourceUnit":{"type":"CurrentTarget"}}},"op":"OpLt","rhs":{"const":{"val":"35%"}}}},"#,
+            "",
+        )],
+    ));
+    assert_eq!(player["dps"], without["dps"]);
+}
