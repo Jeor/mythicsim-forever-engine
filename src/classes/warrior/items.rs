@@ -37,3 +37,32 @@ impl MightRage {
         fight.add_rage(self.rage, self.metrics);
     }
 }
+
+/// Dreadnaught's Battlegear's 8 piece bonus (spell 28845), from Go items.go: a landed hit taken
+/// while the warrior's health is below the share puts up Cheat Death a batch window later. The
+/// trigger rolls nothing.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CheatDeath {
+    pub(crate) aura: AuraRef,
+    pub(crate) health_fraction: f64,
+}
+
+impl CheatDeath {
+    /// The trigger's OnSpellHitTaken for a hit not flagged a proc: Go's `ExtraCondition` reads
+    /// `CurrentHealthPercent` as the hit lands, the handler runs a batch window later.
+    pub(crate) fn on_hit_taken<A: Agent>(
+        &self,
+        fight: &mut Fight<A>,
+        aura: AuraRef,
+        spell: SpellId,
+        result: &SpellResult,
+    ) {
+        if !result.landed() {
+            return;
+        }
+        if fight.player.health / fight.player_max_health() >= self.health_fraction {
+            return;
+        }
+        fight.schedule_delayed_proc(aura, spell, *result);
+    }
+}

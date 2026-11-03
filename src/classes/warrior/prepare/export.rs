@@ -279,6 +279,16 @@ impl Warrior {
                 "rng_label": "Battlegear of Might - 5PC", "proc_chance": 0.2, "rage": 1.0,
                 "metrics_action_id": json!({"spell_id": 29478})}));
         }
+        // items.go Dreadnaught's Battlegear 8 piece.
+        if let (Some(trigger), Some(aura)) = (
+            sim.get_aura(unit, "Dreadnaught's Battlegear 8P"),
+            sim.get_aura(unit, "Cheat Death"),
+        ) {
+            effects.push(
+                json!({"kind": "cheat_death", "trigger_aura": sim.aura(trigger).label,
+                "aura": sim.aura(aura).label, "health_fraction": 0.2}),
+            );
+        }
         // talents_arms.go registerSweepingStrikes.
         if let Some(aura) = sim.get_aura(unit, "Sweeping Strikes") {
             let row = data.sweeping_strikes.highest();

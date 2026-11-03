@@ -18,16 +18,18 @@ pub(crate) struct CrusaderJudgement {
 }
 
 /// Judgement of the Crusader's `ApplyEffects`: an outcome that always hits, then the rank's
-/// debuff.
+/// debuff on the judged target (Go `Get(target)` of the rank's aura array).
 pub(crate) fn judge(fight: &mut Fight<PaladinAgent>, spell: SpellId, target: Side, aura: AuraRef) {
     let result = fight.calc_outcome(spell, target, Outcome::AlwaysHit);
     fight.deal_damage(spell, result, false);
-    fight.activate_aura(aura);
+    let debuff = fight.aura_on(aura, target);
+    fight.activate_aura(debuff);
 }
 
-/// The exclusive effect's gain and expiry: the member's Holy spell damage on the target. The
-/// raid's debuff gains only at the reset, where the prepared target already holds its bonus.
-pub(crate) fn toggle(fight: &mut Fight<PaladinAgent>, member: usize, active: bool) {
+/// The exclusive effect's gain and expiry: the member's Holy spell damage on the target that
+/// holds the aura. The raid's debuff gains only at the reset, where the prepared target already
+/// holds its bonus.
+pub(crate) fn toggle(fight: &mut Fight<PaladinAgent>, aura: AuraRef, member: usize, active: bool) {
     let judgement = fight.agent.crusader_judgements[member];
     if judgement.raid && active {
         return;
@@ -37,5 +39,5 @@ pub(crate) fn toggle(fight: &mut Fight<PaladinAgent>, member: usize, active: boo
     } else {
         -judgement.bonus
     };
-    fight.add_target_school_bonus_spell_damage(Side::Target, school_index(2), delta);
+    fight.add_target_school_bonus_spell_damage(aura.side, school_index(2), delta);
 }

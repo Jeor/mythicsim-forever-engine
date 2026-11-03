@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{
-    items::MightRage,
+    items::{CheatDeath, MightRage},
     spells::{
         battle_shout::{self, BattleShout},
         berserker_rage::{self, BerserkerRage},
@@ -161,6 +161,8 @@ pub(crate) enum WarriorAura {
     ImprovedHamstringTrigger,
     /// Battlegear of Might's 5 piece bonus.
     MightRage,
+    /// Dreadnaught's Battlegear's 8 piece bonus, whose trigger puts up Cheat Death.
+    CheatDeathTrigger,
     /// Sweeping Strikes' charges, whose trigger copies hits to the next target.
     SweepingStrikes,
 }
@@ -243,6 +245,7 @@ pub(crate) struct WarriorAgent {
     /// Go `copyDamage`, which the Sweeping Strikes hit spell deals on its next cast.
     sweeping_copy: f64,
     might_rage: Option<MightRage>,
+    cheat_death: Option<CheatDeath>,
     shield_wall: Option<ShieldWall>,
     shield_block: Option<ShieldBlock>,
     pub(crate) last_stand: Option<LastStand>,
@@ -387,6 +390,9 @@ impl WarriorAgent {
                 }
                 Effect::BattlegearOfMightRage { trigger_aura, .. } => {
                     auras.push((trigger_aura.clone(), WarriorAura::MightRage))
+                }
+                Effect::CheatDeath { trigger_aura, .. } => {
+                    auras.push((trigger_aura.clone(), WarriorAura::CheatDeathTrigger))
                 }
                 Effect::ImprovedHamstring { trigger_aura, .. } => {
                     auras.push((trigger_aura.clone(), WarriorAura::ImprovedHamstringTrigger))
@@ -737,6 +743,16 @@ impl WarriorAgent {
                         proc_chance: *proc_chance,
                         rage: *rage,
                         metrics,
+                    })
+                }
+                Effect::CheatDeath {
+                    aura,
+                    health_fraction,
+                    ..
+                } => {
+                    fight.agent.cheat_death = Some(CheatDeath {
+                        aura: fight.player_aura(aura)?,
+                        health_fraction: *health_fraction,
                     })
                 }
                 Effect::SweepingStrikes { aura, charges, .. } => {
@@ -1926,6 +1942,11 @@ impl Agent for WarriorAgent {
             params.on_hit_taken(fight, aura, 0, result);
             return;
         }
+        if kind == WarriorAura::CheatDeathTrigger {
+            let params = fight.agent.cheat_death.expect("bound");
+            params.on_hit_taken(fight, aura, 0, result);
+            return;
+        }
         // The target's swing is a melee auto attack without the proc flag.
         Self::hit_taken(fight, kind, result, false, true);
     }
@@ -1948,6 +1969,13 @@ impl Agent for WarriorAgent {
             // Go's proc trigger skips a spell flagged a proc.
             if !proc {
                 let params = fight.agent.might_rage.clone().expect("bound");
+                params.on_hit_taken(fight, aura, spell, result);
+            }
+            return;
+        }
+        if kind == WarriorAura::CheatDeathTrigger {
+            if !proc {
+                let params = fight.agent.cheat_death.expect("bound");
                 params.on_hit_taken(fight, aura, spell, result);
             }
             return;
@@ -2040,6 +2068,10 @@ impl Agent for WarriorAgent {
             WarriorAura::MightRage => {
                 let params = fight.agent.might_rage.clone().expect("bound");
                 params.grant(fight);
+            }
+            WarriorAura::CheatDeathTrigger => {
+                let aura = fight.agent.cheat_death.expect("bound").aura;
+                fight.activate_aura(aura);
             }
             _ => {}
         }

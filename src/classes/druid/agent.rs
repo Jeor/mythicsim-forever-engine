@@ -1477,10 +1477,10 @@ impl Agent for DruidAgent {
         }
     }
 
-    fn on_exclusive_gain(fight: &mut Fight<Self>, _aura: AuraRef, kind: DruidAura) {
+    fn on_exclusive_gain(fight: &mut Fight<Self>, aura: AuraRef, kind: DruidAura) {
         if kind == DruidAura::FaerieFire {
             let faerie_fire = fight.agent.faerie_fire.expect("Faerie Fire is bound");
-            faerie_fire.on_exclusive_gain(fight);
+            faerie_fire.on_exclusive_gain(fight, aura);
         }
     }
 
@@ -1515,7 +1515,7 @@ impl Agent for DruidAgent {
         }
     }
 
-    fn on_expire(fight: &mut Fight<Self>, _aura: AuraRef, kind: DruidAura) {
+    fn on_expire(fight: &mut Fight<Self>, aura: AuraRef, kind: DruidAura) {
         match kind {
             DruidAura::Clearcasting => Self::omen(fight).on_expire(fight),
             DruidAura::NaturesGrace => Self::natures_grace(fight).on_expire(fight),
@@ -1527,7 +1527,7 @@ impl Agent for DruidAgent {
             DruidAura::Berserk => fight.agent.berserk.expect("bound").on_expire(fight),
             DruidAura::FaerieFire => {
                 let faerie_fire = fight.agent.faerie_fire.expect("Faerie Fire is bound");
-                faerie_fire.on_expire(fight);
+                faerie_fire.on_expire(fight, aura);
             }
             DruidAura::BearForm => fight
                 .agent

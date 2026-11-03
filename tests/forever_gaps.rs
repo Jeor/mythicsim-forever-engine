@@ -22,6 +22,7 @@ const RECORDED_IN_113554: &[&str] = &[
     "retribution-paladin-swap-dark-iron-sunderer",
     "protection-paladin-quel-serrar",
     "retribution-paladin-swap-without-crowd-pummeler",
+    "protection-paladin-change-target-casts",
 ];
 
 fn request(name: &str) -> Value {
@@ -1209,4 +1210,188 @@ fn a_rotation_for_a_removed_crowd_pummeler_prepares() {
     let result = simulate_prepared(&reference).unwrap().result;
     let player = &result["raidMetrics"]["parties"][0]["players"][0];
     assert_eq!(player["dps"]["avg"].as_f64(), Some(735.1341492796465));
+}
+
+/// The player's damage on each target of an action with this spell id and tag, in unit order.
+fn damage_by_target(player: &Value, spell_id: i64, tag: i64) -> Vec<f64> {
+    let action = player["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|action| {
+            action["id"]["spellId"].as_i64() == Some(spell_id)
+                && action["id"]["tag"].as_i64().unwrap_or(0) == tag
+        })
+        .unwrap_or_else(|| panic!("no action {spell_id} tag {tag}"));
+    action["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|target| target["damage"].as_f64().unwrap_or(0.0))
+        .collect()
+}
+
+/// The uptime of an aura with this spell id and no tag on each target of the encounter.
+fn target_uptimes(result: &Value, spell_id: i64) -> Vec<f64> {
+    result["encounterMetrics"]["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|target| {
+            target["auras"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|aura| {
+                    aura["id"]["spellId"].as_i64() == Some(spell_id)
+                        && aura["id"]["tag"].as_i64().unwrap_or(0) == 0
+                })
+                .map(|aura| aura["uptimeSecondsAvg"].as_f64().unwrap_or(0.0))
+                .sum()
+        })
+        .collect()
+}
+
+/// A recorded request as the file holds it.
+fn recorded(name: &str) -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("fixtures/forever-gaps/{name}.request.json"));
+    serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+}
+
+/// A request prepared under Go's rules, through the gate and run: the result.
+fn run_go_rules(request: &Value) -> Value {
+    let value =
+        prepare_json_with(request.to_string().as_bytes(), "rust", Rules::GoReference).unwrap();
+    run_prepared(&value)
+}
+
+/// The player's metrics of a result.
+fn first_player(result: &Value) -> &Value {
+    &result["raidMetrics"]["parties"][0]["players"][0]
+}
+
+/// A Protection Paladin who tabs between three targets every 1.5 seconds and casts at each
+/// (production sims a24b088f, c2f83691, c4f312be, ee6188ba, fa5e3460 and 4f3f0444, 3 November
+/// 2026). Each cast lands on the target the paladin faces: Holy Strike (10333) and Hammer of
+/// Wrath (24239) hit all three, and the seal's procs and judgements follow.
+#[test]
+fn a_paladin_casts_at_the_target_it_changes_to() {
+    let (_, player) = run("protection-paladin-change-target-casts");
+    for (spell, tag) in [(10333, 0), (24239, 0), (20286, 0)] {
+        let damage = damage_by_target(&player, spell, tag);
+        assert!(
+            damage[..3].iter().all(|&dealt| dealt > 0.0),
+            "{spell}: {damage:?}"
+        );
+    }
+}
+
+/// The same change of target pattern on a Retribution and Protection Paladin of the reference's
+/// tree (the five target tanking reference with the production sims' changes of target first):
+/// under Go's rules it matches the pinned Go engine to the last digit, Vindication (440667) and
+/// the judgement refresh on each target included. With Seal of the Crusader in place of Seal of
+/// Righteousness and without the raid's Judgement of the Crusader, the judgement's debuff
+/// (20300) goes up on the targets it is cast at, as in Go. Go a667dce84, `GOMAXPROCS=1`, 50
+/// iterations, seed 42.
+#[test]
+fn a_paladins_casts_at_other_targets_match_go() {
+    let name = "ret-protection-paladin-change-target-casts-go-tree";
+    let result = run_go_rules(&recorded(name));
+    let player = first_player(&result);
+    assert_eq!(player["dps"]["avg"].as_f64(), Some(684.6135919298804));
+    assert_eq!(player["threat"]["avg"].as_f64(), Some(1147.1546283790585));
+    let vindication = target_uptimes(&result, 440667);
+    assert!(
+        vindication[1] > 0.0 && vindication[2] > 0.0,
+        "{vindication:?}"
+    );
+
+    let text = recorded(name)
+        .to_string()
+        .replace(r#""spellId":20293"#, r#""spellId":20305"#);
+    let mut crusader: Value = serde_json::from_str(&text).unwrap();
+    crusader["raid"]["debuffs"]
+        .as_object_mut()
+        .unwrap()
+        .remove("judgementOfTheCrusader");
+    let result = run_go_rules(&crusader);
+    let player = first_player(&result);
+    assert_eq!(player["dps"]["avg"].as_f64(), Some(535.97876169079));
+    assert_eq!(player["threat"]["avg"].as_f64(), Some(851.9503957344222));
+    let judged = target_uptimes(&result, 20300);
+    assert!(judged[1] > 0.0 && judged[2] > 0.0, "{judged:?}");
+}
+
+/// Faerie Fire at another target puts up that target's copy of the debuff, as Go's
+/// `FaerieFireAuras` by unit index: a Balance Druid of the Thorns fixture against three targets,
+/// without the raid's Faerie Fire, keeps it on the second target only.
+#[test]
+fn faerie_fire_lands_on_the_target_it_is_cast_at() {
+    let mut request = request("balance-druid-thorns");
+    let target = request["encounter"]["targets"][0].clone();
+    request["encounter"]["targets"] = Value::from(vec![target.clone(), target.clone(), target]);
+    request["raid"]["debuffs"]
+        .as_object_mut()
+        .unwrap()
+        .remove("faerieFire");
+    let second = json!({"type": "Target", "index": 1});
+    let line = json!({"action": {
+        "castSpell": {"spellId": {"spellId": 9907}, "target": second},
+        "condition": {"not": {"val": {"auraIsActive": {"auraId": {"spellId": 9907}, "sourceUnit": second}}}}
+    }});
+    request["raid"]["parties"][0]["players"][0]["rotation"]["priorityList"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, line);
+    let prepared =
+        prepare_json_with(request.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
+    let result = run_prepared(&prepared);
+    let uptimes = target_uptimes(&result, 9907);
+    assert_eq!(uptimes[0], 0.0, "{uptimes:?}");
+    assert!(uptimes[1] > 60.0, "{uptimes:?}");
+    assert_eq!(uptimes[2], 0.0, "{uptimes:?}");
+}
+
+/// A Feral Bear tanking five targets that tabs between them with Faerie Fire in its rotation
+/// (production sims f5677940 and 2ef435a9, 3 November 2026): the gate no longer refuses the
+/// cast at the other targets.
+#[test]
+fn a_bears_faerie_fire_at_other_targets_runs() {
+    run("feral-bear-druid-change-target-faerie-fire");
+}
+
+/// Dreadnaught's Battlegear (8) on a Protection Warrior (production sim c6423ab0, 3 November
+/// 2026): a landed hit taken below 20% health puts up Cheat Death (28846) a batch window later.
+/// Under Go's rules the request matches the pinned Go engine to the last digit, Cheat Death's
+/// uptime included (Go a667dce84, `GOMAXPROCS=1`, 50 iterations, seed 42). A heal with a healing
+/// coefficient would take its healing bonus, which the runtime does not add, so the gate
+/// refuses one.
+#[test]
+fn dreadnaughts_cheat_death_goes_up_below_a_fifth_of_health() {
+    let (value, player) = run("protection-warrior-dreadnaught-8p");
+    assert!(kinds(&value).contains(&"cheat_death"));
+    assert!(aura_uptime(&player, 28846) > 0.0);
+    let result = run_go_rules(&recorded("protection-warrior-dreadnaught-8p"));
+    let reference = first_player(&result);
+    assert_eq!(reference["dps"]["avg"].as_f64(), Some(607.046221838354));
+    assert_eq!(
+        reference["threat"]["avg"].as_f64(),
+        Some(1363.6815012222628)
+    );
+    assert_eq!(aura_uptime(reference, 28846), 34.00688825306);
+
+    let mut scaled = value.clone();
+    let spells = scaled["player"]["spells"].as_array_mut().unwrap();
+    let blood_craze = spells
+        .iter_mut()
+        .find(|spell| spell["action_id"]["spell_id"].as_i64() == Some(16488))
+        .expect("Blood Craze");
+    blood_craze["bonus_coefficient"] = json!(0.5);
+    let prepared: PreparedV2 = serde_json::from_value(scaled).unwrap();
+    let refused = check_prepared(&prepared).unwrap_err();
+    assert!(
+        format!("{refused:?}").contains("Cheat Death's healing taken bonus"),
+        "{refused:?}"
+    );
 }

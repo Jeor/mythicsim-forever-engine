@@ -23,6 +23,7 @@ const EFFECTS: &[&str] = &[
     "anger_management",
     "battle_shout",
     "battlegear_of_might_rage",
+    "cheat_death",
     "blood_craze",
     "berserker_rage",
     "bloodthrill",
@@ -128,7 +129,8 @@ fn claims(effect: &Effect) -> Vec<(&'static str, &str)> {
         | Effect::WeaponmasterSword { trigger_aura, .. }
         | Effect::OverpowerWindow { trigger_aura, .. }
         | Effect::ImprovedHamstring { trigger_aura, .. }
-        | Effect::BattlegearOfMightRage { trigger_aura, .. } => vec![("player", trigger_aura)],
+        | Effect::BattlegearOfMightRage { trigger_aura, .. }
+        | Effect::CheatDeath { trigger_aura, .. } => vec![("player", trigger_aura)],
         Effect::WarriorFlurry {
             trigger_aura, aura, ..
         }
@@ -219,6 +221,23 @@ fn limits(prepared: &PreparedV2, reachable: &[&Spell]) -> Vec<String> {
             | Effect::DeepWounds {
                 tick_magic: true, ..
             } => reasons.push(format!("{} ticks roll on the magic table", effect.kind())),
+            // Cheat Death adds healing taken, which reaches a heal only through its healing
+            // coefficient; the runtime keeps the player's heals at the prepared healing power.
+            Effect::CheatDeath { aura, .. } => {
+                let scaled = prepared.player.spells.iter().any(|spell| {
+                    spell.has_flag("SpellFlagHelpful")
+                        && (spell.bonus_coefficient > 0.0
+                            || spell
+                                .dot
+                                .as_ref()
+                                .is_some_and(|dot| dot.bonus_coefficient > 0.0))
+                });
+                if scaled {
+                    reasons.push(format!(
+                        "{aura}'s healing taken bonus would raise a heal with a healing coefficient"
+                    ));
+                }
+            }
             _ => {}
         }
     }

@@ -1620,6 +1620,7 @@ const HIT_TAKEN_EFFECTS: &[&str] = &[
     "spell_data_heal_proc",
     "spell_data_stat_proc",
     "battlegear_of_might_rage",
+    "cheat_death",
 ];
 
 /// Effects that slow the target's melee speed through its live multiplier, with the target

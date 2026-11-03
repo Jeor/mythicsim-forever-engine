@@ -14,7 +14,7 @@ pub(crate) const GATE: ClassGate = ClassGate {
     limits,
     several_targets: Some(several_targets),
     tanks_several_targets: true,
-    other_target_casts: None,
+    other_target_casts: Some(other_target_casts),
     self_spells: &[],
 };
 
@@ -308,4 +308,29 @@ fn crusader_limits(prepared: &PreparedV2, reachable: &[&Spell]) -> Vec<String> {
 /// of the boss swing at it, which the runtime follows.
 fn several_targets(_prepared: &PreparedV2, reachable: &[&Spell]) -> Vec<String> {
     crate::engine::coverage::spells_reaching_other_targets(reachable, &[])
+}
+
+/// A cast aimed at another target lands its hit, its seal's judgement and that judgement's
+/// debuff there as in Go, and the melee hits that land there refresh that target's judgements
+/// and put Vindication on it. Light's Vigil keeps its vigil on the first target, which Holy
+/// Shock then reads, so those are refused.
+fn other_target_casts(prepared: &PreparedV2, spells: &[&Spell]) -> Vec<String> {
+    let vigil = prepared
+        .effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::LightsVigil { .. }));
+    spells
+        .iter()
+        .filter(|spell| match spell.class_spell.as_deref() {
+            Some("lights_vigil") => true,
+            Some("holy_shock") => vigil,
+            _ => false,
+        })
+        .map(|spell| {
+            format!(
+                "{} at a target past the first reads the vigil on the first target only",
+                spell.action_id.clone().unwrap_or_default()
+            )
+        })
+        .collect()
 }
