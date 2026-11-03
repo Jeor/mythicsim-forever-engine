@@ -47,6 +47,8 @@ const EFFECTS: &[&str] = &[
     "kidney_shot",
     "expose_armor",
     "riposte",
+    "shank",
+    "poised",
 ];
 
 /// The effect kind whose implementation executes a Rogue spell.
@@ -75,6 +77,7 @@ fn spell_capability(spell: &Spell) -> Option<&'static str> {
         "kidney_shot" => Some("kidney_shot"),
         "expose_armor" => Some("expose_armor"),
         "riposte" => Some("riposte"),
+        "shank" => Some("shank"),
         _ => None,
     }
 }
@@ -93,6 +96,7 @@ fn claims(effect: &Effect) -> Vec<(&'static str, &str)> {
         | Effect::ColdBlood { aura, .. }
         | Effect::Venom { aura, .. }
         | Effect::Quietus { aura, .. }
+        | Effect::Poised { aura, .. }
         | Effect::ThousandCuts { aura, .. } => vec![("player", aura)],
         Effect::RogueProc { trigger_aura, .. } => vec![("player", trigger_aura)],
         Effect::ExposeArmor { aura, .. } => vec![("target", aura)],

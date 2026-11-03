@@ -145,6 +145,10 @@ static CLASS_SPELLS: &[ClassSpellName] = &[
         mask: masks::KIDNEY_SHOT,
         name: "kidney_shot",
     },
+    ClassSpellName {
+        mask: masks::SHANK,
+        name: "shank",
+    },
 ];
 
 /// Go `sliceAndDiceDurations`: Slice and Dice and Venom share this ladder, by combo points.
@@ -196,6 +200,7 @@ pub(super) struct RogueSpells {
     pub mutilate: Option<SpellId>,
     pub preparation: Option<SpellId>,
     pub premeditation: Option<SpellId>,
+    pub shank: Option<SpellId>,
     pub venom: Option<SpellId>,
 }
 
@@ -207,6 +212,7 @@ pub(super) struct RogueAuras {
     pub cutthroat: Option<AuraId>,
     pub expose_armor: Vec<Option<AuraId>>,
     pub hemorrhage: Vec<Option<AuraId>>,
+    pub poised: Option<AuraId>,
     pub slice_and_dice: Option<AuraId>,
     pub stealth: Option<AuraId>,
     pub thousand_cuts: Option<AuraId>,
@@ -322,6 +328,9 @@ impl PrepAgent for Rogue {
         self.register_slice_and_dice(sim, unit);
         self.register_vanish_spell(sim, unit);
         self.register_stealth_aura(sim, unit);
+        // The notes of 2 November 2026 add Shank and Poised to Forever's Rogue.
+        self.register_shank_spell(sim, unit);
+        self.register_poised_aura(sim, unit);
 
         // Forever states a flat SpellAuraOptions.ProcChance of 100 on the talent spell and puts
         // the real per-rank chance on the effect, so the row's ProcChance would read 100% at

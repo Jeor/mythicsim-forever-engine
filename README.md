@@ -404,6 +404,35 @@ the Go goldens and exporter uses. The departures:
   modelled: Riptide (about 40% less mana, a 12 sec cooldown and no initial heal, which only
   Restoration's healer sims read), the Windfury animations, Totemic Call and Elemental Reach's
   cooldown. `tools/dev_notes_check.py` lists each row.
+- The same notes for Rogue, the changes that do not depend on the new talent trees (Forever
+  preparation, from the notes alone; the rows are in `prepare::hotfix_113554`, the reference keeps
+  the frozen data). Instant Poison takes 1% of attack power (was 0.5%) and Deadly Poison 0.9% a
+  tick and stack (was 0.45%), Mutilate deals 90% weapon damage with each hand (was 75%; the flat
+  damage each hand adds is multiplied by the same share, which is how the notes' "additional amount
+  that was also increased" follows, since no row or note gives the amount on its own), Hemorrhage's
+  15% damage taken applies to the rogue's Garrote as well as Rupture, Flawless Execution takes 15
+  Energy off Eviscerate (was 10), Aggression is 5/10/15% on Sinister Strike and Eviscerate only
+  (was 2/4/6% on those and Backstab), and Efficient Strikes (Improved Sinister Strike) takes 3/5
+  Energy off Hemorrhage as well as Sinister Strike. Shank (learned at level 24; a level 60 rogue
+  has rank 2) and Poised are new baseline abilities: Shank costs 5 Energy on a 10 sec cooldown and
+  strikes with the off hand weapon for 50% weapon damage, generating 25 Energy, and exists only
+  while an off hand weapon is held; it cannot miss, so it rolls as each hand of Mutilate does
+  (blocked or critical, never missed, dodged or parried), is on the Global Cooldown and takes the
+  off hand's damage penalty like the other off hand strikes. Poised is up at the start of every
+  fight (out of combat at maximum Energy) and takes 10 Energy off the first Energy ability. The
+  client has no rows for Shank or Poised yet, so they have the provisional spell ids 1399001 and
+  1399002 (`prepare::spells`), which a rotation names Shank by, until a client build states the
+  real ones. Already the engine's: Improved Eviscerate, renamed Coup de Grace, is 7/13/20% in the
+  client data, and Improved Sinister Strike is 3/5 Energy. Hemorrhage and Ghostly Strike "dealing
+  much more damage than intended with a Dagger" is a server side fault the engine does not share:
+  it reads the client's dagger effect (145% and 180%) in place of the plain share, never on top of
+  it, and the live store of 3 November still states those numbers. Not modelled: Death Mark
+  (Coup de Grace's 7/13/20% on it), which the engine has no spell for. Not taken yet, since they
+  depend on the new talent layout: the point counts of Lethality, Relentless Strikes, Seal Fate,
+  Dual Wield Specialization, Opportunity, Camouflage and Setup, the removed talents (Murder,
+  Quietus, Cutthroat, Thousand Cuts, Improved Distract), the new talents (Composure, Blood
+  Splatter, Flash of Steel, Boot Knife, Death Mark, Venom's Shank and Quick Getaway) and the row
+  moves. `tools/dev_notes_check.py` checks the rows of the Rogue part too.
 - A damage bonus applied after the calculation is threat too (`threat_follows_damage_bonus`,
   Forever preparation), from MythicSim's Discord (26 October 2026, Vrelk: a Shadow Priest with
   no threat talents had less threat than damage). Improved Mind Flay's ramp, Ice Lance on a

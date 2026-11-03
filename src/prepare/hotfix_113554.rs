@@ -141,6 +141,9 @@ const TALENT_CURVES_20261102: &[(i32, &[&[f64]])] = &[
     (408438, &[&[10.0, 20.0, 30.0]]),
     (415140, &[&[50.0, 100.0, 150.0]]),
     (16256, &[&[6.0, 12.0, 18.0, 24.0, 30.0]]),
+    // Rogue: Aggression 5/10/15% (was 2/4/6%), on Sinister Strike and Eviscerate only; the mask
+    // is in the Rogue's registration.
+    (18427, &[&[5.0, 10.0, 15.0]]),
 ];
 
 /// A talent's ladder under `rules`: the curve of [`TALENT_CURVES_20261102`] under Forever's rules
@@ -257,6 +260,19 @@ pub(crate) const CHAIN_LIGHTNING_COSTS_20261102: [(i32, i32); 4] =
 
 /// Chain Lightning's cast time under the notes of 2 November.
 pub(crate) const CHAIN_LIGHTNING_CAST_MS_20261102: i32 = 2500;
+/// Every Mutilate hit spell, a main hand and an off hand strike for each of four ranks, whose
+/// weapon damage effect the notes of 2 November raise from 75% to 90%. The flat damage a hit adds
+/// is read through the same share, so it grows with it.
+pub(crate) const MUTILATE_HIT_RANKS: [i32; 8] = [
+    1310705, 1310706, 399960, 399961, 1241585, 1241588, 1241586, 1241590,
+];
+
+/// Mutilate's weapon share under the development notes of 2 November: 90% (was 75%).
+pub(crate) const MUTILATE_WEAPON_SHARE_20261102: f64 = 90.0;
+
+/// Flawless Execution's cost reduction under the notes of 2 November: 15 Energy (was 10), on
+/// SpellEffect 1340441 of 1310711.
+pub(crate) const FLAWLESS_EXECUTION_COST_20261102: f64 = -15.0;
 
 /// Every rank of Slam, whose cooldown the notes of 2 November cut from 18 to 15 sec.
 pub(crate) const SLAM_RANKS: [i32; 5] = [1240193, 1464, 8820, 11604, 11605];
@@ -372,6 +388,21 @@ fn build() -> HashMap<i32, &'static Spell> {
     });
     // Shaman (notes of 2 November): Stormstrike's cooldown 8 sec to 6.
     patch(17364, &|row| row.cooldown_ms = 6000);
+    // Rogue (notes of 2 November): Mutilate deals 90% weapon damage with each hand (was 75%), and
+    // Flawless Execution takes 15 Energy off Eviscerate (was 10). The client has no rows for
+    // either yet.
+    for id in MUTILATE_HIT_RANKS {
+        patch(id, &|row| {
+            for effect in &mut row.effects {
+                if effect.effect_type == dbcenums::E_WEAPON_PERCENT_DAMAGE {
+                    effect.base_points = MUTILATE_WEAPON_SHARE_20261102;
+                }
+            }
+        });
+    }
+    patch(1310711, &|row| {
+        effect(row, 1340441).base_points = FLAWLESS_EXECUTION_COST_20261102
+    });
 
     // Shaman (notes of 2 November): Lightning Bolt, Chain Lightning, the shocks and Lightning
     // Overload's copies, then Chain Lightning's cast time, coefficient and mana.
@@ -440,6 +471,25 @@ mod tests {
             assert_eq!(hotfixed(id).unwrap().category_cooldown_ms, 15000);
         }
         assert_eq!(hotfixed(17364).unwrap().cooldown_ms, 6000);
+        for id in MUTILATE_HIT_RANKS {
+            let weapon = hotfixed(id).unwrap().effect_n(2);
+            assert_eq!(
+                weapon.effect_type,
+                dbcenums::E_WEAPON_PERCENT_DAMAGE,
+                "{id}"
+            );
+            assert_eq!(weapon.base_points, 90.0, "{id}");
+            assert_eq!(must_find(id).effect_n(2).base_points, 75.0, "{id}");
+            // The flat damage the hit adds is the frozen row's, scaled by the share.
+            assert_eq!(
+                hotfixed(id).unwrap().effect_n(1).base_points,
+                must_find(id).effect_n(1).base_points,
+                "{id}"
+            );
+        }
+        let flawless = hotfixed(1310711).unwrap();
+        assert_eq!(flawless.effects[0].base_points, -15.0);
+        assert_eq!(must_find(1310711).effects[0].base_points, -10.0);
         let starfire = hotfixed(9876).unwrap();
         assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
     }
