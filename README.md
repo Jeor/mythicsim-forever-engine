@@ -607,7 +607,7 @@ the Go goldens and exporter uses. The departures:
   cooldown, and its category (79, 3 seconds) is not the potion category (4), so it shares nothing
   with the potions. Neither row is in the pinned game data, so `src/prepare/oil_of_immolation.rs`
   restates them as literals. A request opts in with `consumables.oilOfImmolation: true`, a
-  Rust-only boolean of the consumables message (`FOREVER_BOOL_FIELDS` in
+  Rust-only boolean of the consumables message (`FOREVER_FIELDS` in
   `src/contracts/request/schema.rs`, field 1000; the Go reference refuses it as an unknown
   field). The character uses the oil 0.5 s before the pull, so the shield is up at the pull, and
   again each time the shield ends, all fight. Every 3 seconds from each use (the first tick 2.5 s
@@ -627,6 +627,18 @@ the Go goldens and exporter uses. The departures:
   yards, such as a ranged character at range, takes none. Nothing changes without the field
   (the prepared effect is `oil_of_immolation`, `src/core/fight/oil_of_immolation.rs`,
   `tests/classes/oil_of_immolation.rs`).
+- A Shadow Priest's Dark Inspiration in the party, from wowsims/forever at ce4dd1a69
+  (`darkInspirationMeta`, `PartyBuffs.dark_inspiration`) and the client 70425 rows: the talent
+  (1326159, 5 ranks) has Mind Blast and a full Mind Flay channel raise the Spirit of the priest's
+  party by the buff row's 15% (1326168, `A_MOD_PERCENT_STAT`) priced by rank, round(15 * rank /
+  5)%: 3, 6, 9, 12 and 15. A request sets the priest's rank with `partyBuffs.darkInspiration`, a
+  Rust-only int32 of the party buffs (`FOREVER_FIELDS`, field 1001, as upstream's field 15 is
+  Grace of Air Totem in the pinned schema), held to 5. The party's copy is up all fight on the
+  player, never its pets, as upstream's is. Under Forever's rules a Shadow Priest's own copy bids
+  in the party copy's Spirit category and yields ties (upstream `NewSpellDataDarkInspirationAuraFor`, `YieldsTies`),
+  so the two never stack: the stronger holds the Spirit, the party's on a tie
+  (`src/prepare/buffs/dark_inspiration.rs`, `tests/classes/dark_inspiration.rs`). Nothing changes
+  without the field.
 - The Zul'Gurub crafted sets, from the client 1.60.1.70425 ItemSet and ItemSetSpell rows: Blood
   Tiger Harness needs Leatherworking and The Darksoul Blacksmithing (RequiredSkill 165 and 164
   at 300), as Bloodvine Garb needs Tailoring, and Bloodsoul Embrace and The Darksoul give their

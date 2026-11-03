@@ -1,5 +1,6 @@
 //! Class and spec integration tests.
 
+mod dark_inspiration;
 mod druid;
 mod external_cooldown;
 mod global_cooldown;
