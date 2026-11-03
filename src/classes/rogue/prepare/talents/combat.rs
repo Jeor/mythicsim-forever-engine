@@ -16,6 +16,7 @@ use crate::prepare::spell_mod::{SpellModConfig, SpellModType};
 use crate::prepare::stats::Stat;
 
 use super::super::masks;
+use super::super::rework;
 use super::super::spell_data::spell_data;
 use super::super::util::{energy_cost, longest_cooldown, proc_mask_for_types, spell_action};
 use super::super::Rogue;
@@ -171,7 +172,7 @@ impl Rogue {
             SpellModConfig {
                 kind: SpellModType::DamageDoneFlat,
                 proc_mask: ProcMask::MELEE_OH,
-                float_value: spell_data().dual_wield_specialization.fraction_at(rank),
+                float_value: rework::talent_ladder(sim.rules, 13715, 2, 5).fraction_at(rank),
                 ..SpellModConfig::default()
             },
         );

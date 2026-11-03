@@ -10,6 +10,8 @@ use std::{fs, path::Path};
 
 #[path = "support/paladin_113554.rs"]
 mod paladin_113554;
+#[path = "support/rogue_113483.rs"]
+mod rogue_113483;
 
 /// The paladin requests recorded with push 113554's talent tree.
 const RECORDED_IN_113554: &[&str] = &[
@@ -29,6 +31,8 @@ fn request(name: &str) -> Value {
     if !RECORDED_IN_113554.contains(&name) {
         paladin_113554::forever_request(&mut request);
     }
+    // A rogue's talents read in push 113483's trees.
+    rogue_113483::forever_request(&mut request);
     request
 }
 

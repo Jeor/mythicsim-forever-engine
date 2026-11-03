@@ -16,6 +16,8 @@ mod paladin_113554;
 mod priest;
 mod proc_oil;
 mod rogue;
+#[path = "../support/rogue_113483.rs"]
+mod rogue_113483;
 mod rotation_targets;
 mod rotation_values;
 mod shaman;

@@ -144,6 +144,19 @@ const TALENT_CURVES_20261102: &[(i32, &[&[f64]])] = &[
     // Rogue: Aggression 5/10/15% (was 2/4/6%), on Sinister Strike and Eviscerate only; the mask
     // is in the Rogue's registration.
     (18427, &[&[5.0, 10.0, 15.0]]),
+    // Rogue (the rework of pushes 113351 and 113483, client 1.60.1.70755 with hotfixes to push
+    // 113583): Lethality 10/20% (two ranks, was 4 to 20% in five), Seal Fate 33/66/100% (three
+    // ranks, was 20 to 100% in five), Opportunity 4 to 20% on both its effects (five ranks, was
+    // 5/10%) and Dual Wield Specialization 25/50% (two ranks, was 5 to 25% in five). The
+    // TraitDefinition curves of wowsims/forever #840's store; Wowhead's calculator states the
+    // same texts.
+    (14128, &[&[10.0, 20.0]]),
+    (14186, &[&[33.0, 66.0, 100.0]]),
+    (
+        14057,
+        &[&[4.0, 8.0, 12.0, 16.0, 20.0], &[4.0, 8.0, 12.0, 16.0, 20.0]],
+    ),
+    (13715, &[&[25.0, 50.0]]),
 ];
 
 /// A talent's ladder under `rules`: the curve of [`TALENT_CURVES_20261102`] under Forever's rules

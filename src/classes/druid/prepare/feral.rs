@@ -36,7 +36,7 @@ const PROWL_RANKS: [i32; 3] = [5215, 6783, 9913];
 
 /// Poised's spell id. The client of 1.60.1.70707 has no row for Poised (the notes of 2 November
 /// 2026 add it for Druids at level 32 beside the Rogue's), so this is a provisional id beyond
-/// every id the client states, next to the Rogue's 1399002, until a client build carries the
+/// every id the client states, until a client build carries the
 /// real one.
 pub(crate) const POISED_SPELL_ID: i32 = 1_399_003;
 /// The Energy Poised takes off the next Energy ability.
