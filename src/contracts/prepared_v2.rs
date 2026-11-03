@@ -4827,8 +4827,9 @@ pub enum Effect {
         spell_id: i32,
         energy_gain: f64,
     },
-    /// Poised, Forever's rules only: an aura the fight starts with, which the first Energy
-    /// ability spends, taking `cost_reduction` Energy off its cost.
+    /// Poised, Forever's rules only (a Rogue, or a Druid starting in Cat Form): an aura the fight
+    /// starts with, which the first Energy ability spends, taking `cost_reduction` Energy off its
+    /// cost.
     Poised {
         aura: String,
         cost_reduction: i32,

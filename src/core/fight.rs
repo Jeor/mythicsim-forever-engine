@@ -44,6 +44,7 @@ pub(crate) mod movement;
 pub(crate) mod mp5_sources;
 mod oil_of_immolation;
 pub(crate) mod pet;
+pub(crate) mod poised;
 mod power_infusion;
 mod racial;
 pub(crate) mod rage;

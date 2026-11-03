@@ -13,10 +13,11 @@ mod spell_data;
 pub(crate) const RUN_SPELLS: [i32; 6] = [100, 6178, 11578, 20252, 20616, 20617];
 mod spells;
 mod stances;
+mod talent_ranks;
 mod talents;
 
 use crate::contracts::request::Message;
-use crate::prepare::agent::{fill_talents, ClassSpellName, PrepAgent};
+use crate::prepare::agent::{ClassSpellName, PrepAgent};
 use crate::prepare::attack::{AutoAttackOptions, Weapon};
 use crate::prepare::character::constants::DODGE_RATING_PER_DODGE_PERCENT;
 use crate::prepare::env::Environment;
@@ -24,12 +25,10 @@ use crate::prepare::rage::RageBarOptions;
 use crate::prepare::sim::{Sim, StateSlot, UnitId};
 use crate::prepare::spell::ProcMask;
 use crate::prepare::stats::Stat;
+use crate::prepare::talent_layout;
 use crate::prepare::Refusal;
 
 use crate::prepare::common_effects::DIAMOND_FLASK_ITEM;
-
-/// Go warrior.TalentTreeSizes.
-const TALENT_TREE_SIZES: [usize; 3] = [17, 17, 18];
 
 /// The exporter's `warriorClassSpells`: every class mask bit by a stable name.
 static CLASS_SPELLS: &[ClassSpellName] = &[
@@ -300,10 +299,13 @@ pub(crate) fn new_warrior(
         stance_snapshot: class_options.bool("stance_snapshot"),
         has_bs_t2: class_options.bool("has_bs_t2"),
     };
-    let talents = fill_talents(
+    // A talent above its ranks is refused here: the rank ladders panic on it, which a string made
+    // for another tree layout (a community build from before a client tree change) reaches.
+    let (talents, _) = talent_layout::fill(
         "proto.WarriorTalents",
+        "warrior",
         player.str("talents_string"),
-        TALENT_TREE_SIZES,
+        &talent_ranks::TREES,
     )
     .map_err(|err| Refusal::new("talents", err))?;
     sim.enable_rage_bar(

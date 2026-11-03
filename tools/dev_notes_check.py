@@ -60,6 +60,19 @@ ROWS = [
     ("Mutilate rank 4 main hand weapon %", 1241586, 1240654, "BasePoints", 90, 75),
     ("Mutilate rank 4 off hand weapon %", 1241590, 1240661, "BasePoints", 90, 75),
     ("Mutilate rank 1 weapon %", 1310705, 1340423, "BasePoints", 90, 75),
+    ("Riptide rank 3 cooldown (ms)", 1239243, None, "CategoryCooldownMs", 12000, 6000),
+]
+
+# (label, spell id, power cost field, Forever's value, frozen value): the mana cost a row states.
+POWERS = [
+    ("Riptide rank 1 mana (about 40% less)", 408521, "Cost", 147, 245),
+    ("Riptide rank 2 mana (about 40% less)", 1239242, "Cost", 180, 300),
+    ("Riptide rank 3 mana (about 40% less)", 1239243, "Cost", 231, 385),
+]
+
+# (label, spell id, Forever's value, frozen value): the stacks an aura row states.
+STACKS = [
+    ("Vengeance stacks (Paladin, 5 in the notes)", 20050, 5, 3),
 ]
 
 # (label, spell id, effect id, class flag bit, whether Forever's rules have it set)
@@ -82,6 +95,11 @@ TALENTS = [
 ]
 
 NOT_IN_DATA = [
+    ("Riptide has no initial heal, only the heal over time",
+     "the tooltip names a heal and a heal over time; the first effect leaves the row as a heal"),
+    ("Poised for Druids (level 32, 10 Energy off the next Energy ability out of combat)",
+     "no client row yet: Forever's rules use the provisional id 1399003; replace it once a client "
+     "build carries the spell"),
     ("Instant Poison 1% and Deadly Poison 0.9% a tick of attack power",
      "poison hits at two attack power values: each grows 0.01 and 0.009 a point (a stack for Deadly)"),
     ("Efficient Strikes takes Energy off Hemorrhage too",
@@ -166,6 +184,18 @@ def check(path):
     differs = 0
     for label, spell, effect_id, field, forever, frozen in ROWS:
         value = row_value(store, spell, effect_id, field)
+        state = verdict(value, forever, frozen)
+        differs += state == "DIFFERS"
+        print(f"  {state:8} {label}: store {value}, Forever {forever:g}, frozen {frozen:g}")
+    for label, spell, field, forever, frozen in POWERS:
+        powers = store.get("Powers", {}).get(str(spell)) or [{}]
+        value = powers[0].get(field)
+        state = verdict(value, forever, frozen)
+        differs += state == "DIFFERS"
+        print(f"  {state:8} {label}: store {value}, Forever {forever:g}, frozen {frozen:g}")
+    for label, spell, forever, frozen in STACKS:
+        options = store.get("AuraOptions", {}).get(str(spell)) or {}
+        value = options.get("MaxStack")
         state = verdict(value, forever, frozen)
         differs += state == "DIFFERS"
         print(f"  {state:8} {label}: store {value}, Forever {forever:g}, frozen {frozen:g}")
