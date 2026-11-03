@@ -47,6 +47,15 @@ ROWS = [
     ("Wrack spell power coefficient", 1316697, 1349556, "SPCoef", 0.286, 0.143),
     ("Stormstrike cooldown (ms)", 17364, None, "CooldownMs", 6000, 8000),
     ("Improved Slam cooldown cut (ms), rank 2", 12862, 1339521, "BasePoints", -5000, -3000),
+    ("Lightning Bolt rank 10 base", 15208, 691780, "BasePoints", 355.5, 196),
+    ("Lightning Bolt rank 5 base", 943, 679378, "BasePoints", 109, 82),
+    ("Lightning Bolt overload rank 10 base", 408477, 1072630, "BasePoints", 178, 98),
+    ("Chain Lightning rank 4 base", 10605, 688920, "BasePoints", 519, 123),
+    ("Chain Lightning rank 4 spell power coefficient", 10605, 688920, "SPCoef", 0.714, 0.571),
+    ("Earth Shock rank 7", 10414, 688559, "BasePoints", 531, 301),
+    ("Flame Shock rank 6, direct", 29228, 704945, "BasePoints", 292, 166),
+    ("Flame Shock rank 6, a tick", 29228, 704946, "BasePoints", 80, 44),
+    ("Frost Shock rank 4", 10473, 688022, "BasePoints", 506, 283),
     ("Flawless Execution Energy", 1310711, 1340441, "BasePoints", -15, -10),
     ("Mutilate rank 4 main hand weapon %", 1241586, 1240654, "BasePoints", 90, 75),
     ("Mutilate rank 4 off hand weapon %", 1241590, 1240661, "BasePoints", 90, 75),
@@ -91,6 +100,10 @@ NOT_IN_DATA = [
     ("Maelstrom Weapon chance doubled (20 PPM)",
      "count stacks over a few minutes of melee with a known weapon speed"),
     ("Stormstrike 150% weapon damage", "Stormstrike hits against a dummy with a known weapon"),
+    ("Chain Lightning cast time 2.5 sec and mana 248/304/428/495 (225% of Lightning Bolt)",
+     "the spell tooltips: the store keeps cast time and power cost outside the effect rows"),
+    ("Call of Thunder, +5% crit for Lightning Bolt and Chain Lightning, in Lava Burst's slot",
+     "the talent's tooltip once it has a row; Lava Burst (1326047) leaves the store with it"),
 ]
 
 

@@ -168,6 +168,100 @@ pub(crate) fn talent(rules: Rules, spell_id: i32, max_ranks: i32) -> Ladder {
     Ladder::talent(spell_id, max_ranks)
 }
 
+/// Blizzard's development notes of 2 November 2026, Shaman: Lightning Bolt's base damage on every
+/// rank (each "roughly 78%" of the Classic Era rank, except the maximum rank, which the notes
+/// "increased by 80%": exactly 1.8 times its old damage at level 60, 200 to 360, so both ends of
+/// its roll scale alike), Chain Lightning's primary target damage (145% of the comparable rank
+/// Lightning Bolt's level 60 damage) and the shocks "reverted to match Classic Era values", as (spell, SpellEffect, base
+/// points). No client row states them yet, so the numbers are derived from the notes' ratios and
+/// Wowhead's Classic Era tooltips, the way wowsims/forever #821 (a preview on a patched spell
+/// store) derives them; the tests rebuild each from its source. Lightning Overload's copies deal
+/// half their rank's damage, as before (the second half of the table).
+pub(crate) const SHAMAN_BASE_POINTS_20261102: [(i32, i32, f64); 50] = [
+    // Lightning Bolt ranks 1 to 10: 15, 27, 45, 61, 82, 111, 147, 162, 178, 196 before. Rank 10's
+    // 355.5 is 360 at level 60, 1.8 times the 200 it was.
+    (403, 678918, 12.0),
+    (529, 679369, 24.0),
+    (548, 679030, 41.0),
+    (915, 679313, 73.0),
+    (943, 679378, 109.0),
+    (6041, 684438, 149.0),
+    (10391, 688309, 195.0),
+    (10392, 688310, 241.0),
+    (15207, 691075, 295.0),
+    (15208, 691780, 355.5),
+    // Chain Lightning ranks 1 to 4: 88, 100, 112, 123 before.
+    (421, 679158, 219.0),
+    (930, 679273, 286.0),
+    (2860, 681324, 431.5),
+    (10605, 688920, 519.0),
+    // Earth Shock ranks 1 to 7: 18, 33, 49, 81, 132, 205, 301 before.
+    (8042, 686790, 20.5),
+    (8044, 685548, 36.5),
+    (8045, 686227, 67.0),
+    (8046, 686672, 130.0),
+    (10412, 687897, 242.0),
+    (10413, 688149, 383.0),
+    (10414, 688559, 531.0),
+    // Flame Shock ranks 1 to 6, the direct hit: 20, 33, 43, 82, 128, 166 before.
+    (8050, 686823, 25.0),
+    (8052, 685531, 51.0),
+    (8053, 686555, 95.0),
+    (10447, 688330, 164.0),
+    (10448, 688934, 245.0),
+    (29228, 704945, 292.0),
+    // Flame Shock ranks 2 to 6, a tick: 8, 14, 21, 34, 44 before (rank 1's 7 stays).
+    (8052, 685532, 12.0),
+    (8053, 686556, 24.0),
+    (10447, 688331, 42.0),
+    (10448, 688935, 64.0),
+    (29228, 704946, 80.0),
+    // Frost Shock ranks 1 to 4: 66, 124, 188, 283 before.
+    (8056, 686558, 98.0),
+    (8058, 687459, 222.5),
+    (10472, 688813, 355.5),
+    (10473, 688022, 506.0),
+    // Lightning Overload's Lightning Bolt, ranks 1 to 10: 7, 14.5, 22.5, 28, 36, 56, 74, 81, 89,
+    // 98 before.
+    (408439, 1072563, 6.0),
+    (408440, 1072564, 12.0),
+    (408441, 1072565, 20.5),
+    (408442, 1072567, 36.5),
+    (408443, 1072569, 54.5),
+    (408472, 1072625, 74.5),
+    (408473, 1072626, 97.5),
+    (408474, 1072627, 120.5),
+    (408475, 1072628, 147.5),
+    (408477, 1072630, 178.0),
+    // Lightning Overload's Chain Lightning, ranks 1 to 4: 44, 50, 56, 62 before.
+    (408479, 1072633, 107.5),
+    (408481, 1072635, 140.5),
+    (408482, 1072636, 213.0),
+    (408484, 1072638, 256.5),
+];
+
+/// Chain Lightning's spell power coefficient under the notes of 2 November: 2.5 sec of cast at
+/// the standard 3.5 sec rate (0.714, was 0.571 and 0.517), and half of it on the Lightning
+/// Overload copy, as before. (spell, SpellEffect, coefficient).
+pub(crate) const CHAIN_LIGHTNING_COEFFICIENTS_20261102: [(i32, i32, f64); 8] = [
+    (421, 679158, 0.714),
+    (930, 679273, 0.714),
+    (2860, 681324, 0.714),
+    (10605, 688920, 0.714),
+    (408479, 1072633, 0.357),
+    (408481, 1072635, 0.357),
+    (408482, 1072636, 0.357),
+    (408484, 1072638, 0.357),
+];
+
+/// Chain Lightning's mana cost ("approximately 225%" of the
+/// comparable Lightning Bolt rank's) under the notes of 2 November, as (spell, mana). The
+/// comparable Lightning Bolt ranks are 6, 7, 9 and 10, the nearest by the level each is learnt.
+pub(crate) const CHAIN_LIGHTNING_COSTS_20261102: [(i32, i32); 4] =
+    [(421, 248), (930, 304), (2860, 428), (10605, 495)];
+
+/// Chain Lightning's cast time under the notes of 2 November.
+pub(crate) const CHAIN_LIGHTNING_CAST_MS_20261102: i32 = 2500;
 /// Every Mutilate hit spell, a main hand and an off hand strike for each of four ranks, whose
 /// weapon damage effect the notes of 2 November raise from 75% to 90%. The flat damage a hit adds
 /// is read through the same share, so it grows with it.
@@ -312,6 +406,21 @@ fn build() -> HashMap<i32, &'static Spell> {
         effect(row, 1340441).base_points = FLAWLESS_EXECUTION_COST_20261102
     });
 
+    // Shaman (notes of 2 November): Lightning Bolt, Chain Lightning, the shocks and Lightning
+    // Overload's copies, then Chain Lightning's cast time, coefficient and mana.
+    for (spell, id, points) in SHAMAN_BASE_POINTS_20261102 {
+        patch(spell, &|row| effect(row, id).base_points = points);
+    }
+    for (spell, id, coefficient) in CHAIN_LIGHTNING_COEFFICIENTS_20261102 {
+        patch(spell, &|row| effect(row, id).sp_coef = coefficient);
+    }
+    for (spell, cost) in CHAIN_LIGHTNING_COSTS_20261102 {
+        patch(spell, &|row| {
+            row.cast_time_ms = CHAIN_LIGHTNING_CAST_MS_20261102;
+            row.powers[0].cost = cost;
+        });
+    }
+
     rows.into_iter()
         .map(|(id, row)| (id, &*Box::leak(Box::new(row))))
         .collect()
@@ -385,6 +494,174 @@ mod tests {
         assert_eq!(must_find(1310711).effects[0].base_points, -10.0);
         let starfire = hotfixed(9876).unwrap();
         assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
+    }
+
+    /// The Shaman rows rebuild from the notes of 2 November 2026 and their sources, so a number
+    /// that drifts from its derivation fails here.
+    #[test]
+    fn shaman_rows_rebuild_from_their_sources() {
+        let base = |spell: i32, effect_id: i32| -> f64 {
+            row(Rules::Forever, spell)
+                .effects
+                .iter()
+                .find(|effect| effect.id == effect_id)
+                .unwrap()
+                .base_points
+        };
+        let table = |spell: i32, effect_id: i32| -> f64 {
+            SHAMAN_BASE_POINTS_20261102
+                .iter()
+                .find(|row| row.0 == spell && row.1 == effect_id)
+                .unwrap()
+                .2
+        };
+        for (spell, effect_id, points) in SHAMAN_BASE_POINTS_20261102 {
+            assert_eq!(base(spell, effect_id), points, "spell {spell}");
+            assert_ne!(
+                must_find(spell)
+                    .effects
+                    .iter()
+                    .find(|effect| effect.id == effect_id)
+                    .unwrap()
+                    .base_points,
+                points,
+                "spell {spell} already states it"
+            );
+        }
+
+        // The level 60 damage of a row with the base points a table states.
+        let at_60 = |spell: i32, effect_id: i32| -> f64 {
+            let effect = must_find(spell)
+                .effects
+                .iter()
+                .find(|effect| effect.id == effect_id)
+                .unwrap();
+            let mut patched = effect.clone();
+            patched.base_points = table(spell, effect_id);
+            patched.average(60)
+        };
+        let frozen_at_60 = |spell: i32| must_find(spell).effects[0].average(60);
+
+        // Lightning Bolt: "roughly 78%" of the Classic Era rank, whose damage at level 60
+        // Wowhead's Classic tooltips average (15 to 17, 28 to 33, ... 428 to 477), on ranks 1 to
+        // 9 ...
+        let classic = [
+            16.0, 30.5, 52.5, 94.0, 140.0, 190.5, 249.5, 308.5, 378.5, 452.5,
+        ];
+        let bolts = [
+            (403, 678918),
+            (529, 679369),
+            (548, 679030),
+            (915, 679313),
+            (943, 679378),
+            (6041, 684438),
+            (10391, 688309),
+            (10392, 688310),
+            (15207, 691075),
+            (15208, 691780),
+        ];
+        for (rank, (spell, effect_id)) in bolts.into_iter().enumerate().take(9) {
+            let expected = (classic[rank] * 0.78_f64).round();
+            assert_eq!(
+                table(spell, effect_id),
+                expected,
+                "Lightning Bolt rank {}",
+                rank + 1
+            );
+        }
+        // ... and the maximum rank is 1.8 times what it was at level 60 (200 to 360), on both
+        // ends of its roll: the row's variance is a share of the average, so the minimum and
+        // maximum scale with it. The Classic Era's 78% of 452.5 is 353 base, within 1% of it.
+        let old = frozen_at_60(15208);
+        let new = at_60(15208, 691780);
+        assert_eq!((old, new), (200.0, 360.0));
+        let variance = row(Rules::Forever, 15208).effects[0].variance;
+        assert_eq!(variance, must_find(15208).effects[0].variance);
+        for end in [-0.5, 0.5] {
+            let scale = 1.0 + end * variance;
+            assert!((new * scale - 1.8 * old * scale).abs() < 1e-9);
+        }
+        assert!((new - 0.78 * classic[9]).abs() / new < 0.03);
+
+        // Chain Lightning: 145% of the comparable Lightning Bolt rank's level 60 damage, ranks
+        // 6, 7, 9 and 10, the nearest by the level each is learnt (32, 40, 48 and 56).
+        let chain = [
+            (421, 679158, 5),
+            (930, 679273, 6),
+            (2860, 681324, 8),
+            (10605, 688920, 9),
+        ];
+        for (spell, effect_id, bolt) in chain {
+            let expected = (at_60(bolts[bolt].0, bolts[bolt].1) * 1.45).round();
+            assert_eq!(at_60(spell, effect_id), expected, "Chain Lightning {spell}");
+        }
+        // Its mana is about 225% of the same ranks' (110, 135, 190 and 220 mana).
+        for ((spell, mana), bolt) in CHAIN_LIGHTNING_COSTS_20261102.into_iter().zip([5, 6, 8, 9]) {
+            let bolt_cost = f64::from(must_find(bolts[bolt].0).powers[0].cost);
+            assert_eq!(f64::from(mana), (bolt_cost * 2.25).round(), "spell {spell}");
+            let chain = row(Rules::Forever, spell);
+            assert_eq!(chain.powers[0].cost, mana);
+            assert_eq!(chain.cast_time_ms, 2500);
+            assert_eq!(must_find(spell).cast_time_ms, 2000);
+        }
+        // 2.5 sec of cast at the standard 3.5 sec rate.
+        for (_, _, coefficient) in CHAIN_LIGHTNING_COEFFICIENTS_20261102.iter().take(4) {
+            assert!((coefficient - 2.5 / 3.5).abs() < 1e-3);
+        }
+
+        // Lightning Overload's copies deal half their rank's damage and coefficient.
+        let overloads = [
+            (403, 408439, 1072563),
+            (529, 408440, 1072564),
+            (548, 408441, 1072565),
+            (915, 408442, 1072567),
+            (943, 408443, 1072569),
+            (6041, 408472, 1072625),
+            (10391, 408473, 1072626),
+            (10392, 408474, 1072627),
+            (15207, 408475, 1072628),
+            (15208, 408477, 1072630),
+            (421, 408479, 1072633),
+            (930, 408481, 1072635),
+            (2860, 408482, 1072636),
+            (10605, 408484, 1072638),
+        ];
+        for (parent, copy, effect_id) in overloads {
+            let parent_effect = row(Rules::Forever, parent).effects[0].id;
+            let half = at_60(parent, parent_effect) / 2.0;
+            assert!(
+                (at_60(copy, effect_id) - half).abs() <= 1.0,
+                "overload of {parent}: {} against {half}",
+                at_60(copy, effect_id)
+            );
+            let parent_coefficient = row(Rules::Forever, parent).effects[0].sp_coef;
+            let copy_coefficient = row(Rules::Forever, copy).effects[0].sp_coef;
+            assert!(
+                (copy_coefficient - parent_coefficient / 2.0).abs() < 1e-3,
+                "{parent}"
+            );
+        }
+
+        // The shocks at Classic Era values, Wowhead's Classic tooltips at level 60.
+        let earth = [20.5, 36.5, 67.0, 130.0, 242.0, 383.0, 531.0];
+        for ((spell, effect_id), expected) in [
+            (8042, 686790),
+            (8044, 685548),
+            (8045, 686227),
+            (8046, 686672),
+            (10412, 687897),
+            (10413, 688149),
+            (10414, 688559),
+        ]
+        .into_iter()
+        .zip(earth)
+        {
+            assert_eq!(table(spell, effect_id), expected, "Earth Shock {spell}");
+        }
+        // 292 and 320 over 12 sec, which is 80 on each of four ticks.
+        assert_eq!(table(29228, 704945), 292.0);
+        assert_eq!(table(29228, 704946) * 4.0, 320.0);
+        assert_eq!(table(10473, 688022), 506.0);
     }
 
     #[test]
