@@ -9,8 +9,13 @@
 use std::rc::Rc;
 
 use crate::prepare::character::constants::{CHARACTER_LEVEL, MAX_MELEE_RANGE};
-use crate::prepare::sim::{AuraConfig, Cooldown, Sim, UnitId, NEVER_EXPIRES};
-use crate::prepare::spell::{Cast, CastConfig, DotConfig, ProcMask, SpellConfig, SpellFlag};
+use crate::prepare::sim::{
+    AuraConfig, Cooldown, Duration, EventCallbacks, Rules, Sim, UnitId, NEVER_EXPIRES, SECOND,
+};
+use crate::prepare::spell::{
+    school, Cast, CastConfig, CostOptions, DefenseType, DotConfig, ProcMask, SpellConfig, SpellFlag,
+};
+use crate::prepare::spell_mod::{SpellModConfig, SpellModType};
 use crate::prepare::spelldata::Spell as Row;
 
 use super::armor;
@@ -29,6 +34,25 @@ pub(super) const FINISHER: SpellFlag = SpellFlag::AGENT_RESERVED3;
 
 /// Go `RogueBleedTag`.
 const ROGUE_BLEED_TAG: &str = "RogueBleed";
+
+/// Shank's spell id. The client of 1.60.1.70707 has no row for Shank or Poised (the notes of
+/// 2 November 2026 add them), so these are provisional ids, beyond every id the client states
+/// (the highest is 1329183), until a client build carries the real ones. The rotation names
+/// Shank by this id.
+pub(crate) const SHANK_SPELL_ID: i32 = 1_399_001;
+/// Poised's spell id, provisional like [`SHANK_SPELL_ID`].
+pub(crate) const POISED_SPELL_ID: i32 = 1_399_002;
+
+/// Shank's Energy cost, and the Energy it generates at rank 2 (level 44; rank 1, level 24, is
+/// 15), which a level 60 rogue knows.
+pub(crate) const SHANK_ENERGY_COST: i32 = 5;
+pub(crate) const SHANK_ENERGY_GAIN: f64 = 25.0;
+/// Shank's weapon damage share, its cooldown and its Global Cooldown.
+const SHANK_WEAPON_SHARE: f64 = 0.5;
+const SHANK_COOLDOWN: Duration = 10 * SECOND;
+const SHANK_GCD: Duration = SECOND;
+/// The Energy Poised takes off the next Energy ability.
+pub(crate) const POISED_COST_REDUCTION: i32 = 10;
 
 /// The fields the Rogue's main hand abilities share: the row's school and defense, a main hand
 /// special proc mask and the melee range.
@@ -350,6 +374,87 @@ impl Rogue {
             },
         );
         self.spells.slice_and_dice = Some(spell);
+    }
+
+    /// Shank (notes of 2 November 2026, Forever's rules only): a baseline strike with the off hand
+    /// weapon for 50% weapon damage that generates Energy. It needs an off hand weapon, so a
+    /// rogue without one has no Shank. Level 24, 5 Energy, a 10 sec cooldown and melee range;
+    /// "cannot miss" reads as the off hand strike of Mutilate does (it can be blocked and crit,
+    /// but is never missed, dodged or parried), and the Global Cooldown and the off hand's
+    /// damage penalty are the other abilities'.
+    pub(super) fn register_shank_spell(&mut self, sim: &mut Sim, unit: UnitId) {
+        if sim.rules != Rules::Forever || sim.oh_weapon(unit).is_none() {
+            return;
+        }
+        let timer = sim.new_timer(unit);
+        let spell = sim.register_spell(
+            unit,
+            SpellConfig {
+                action_id: spell_action(SHANK_SPELL_ID),
+                spell_school: school::PHYSICAL,
+                defense_type: DefenseType::Melee,
+                proc_mask: ProcMask::MELEE_OH_SPECIAL,
+                flags: SpellFlag::MELEE_METRICS | SpellFlag::APL,
+                class_spell_mask: masks::SHANK,
+                max_range: MAX_MELEE_RANGE,
+                cost: CostOptions {
+                    energy_cost: SHANK_ENERGY_COST,
+                    energy_refund: 0.0,
+                    ..CostOptions::default()
+                },
+                cast: CastConfig {
+                    cd: Cooldown {
+                        timer: Some(timer),
+                        duration: SHANK_COOLDOWN,
+                    },
+                    ..ignore_haste_cast(SHANK_GCD)
+                },
+                damage_multiplier: SHANK_WEAPON_SHARE,
+                damage_multiplier_additive: 1.0,
+                threat_multiplier: 1.0,
+                ..SpellConfig::default()
+            },
+        );
+        self.spells.shank = Some(spell);
+    }
+
+    /// Poised (notes of 2 November 2026, Forever's rules only): out of combat at maximum Energy
+    /// the rogue gains Poised, which takes 10 Energy off the next Energy ability. Only the
+    /// opener sees it, so the fight activates it at its start and the first Energy ability
+    /// spends it.
+    pub(super) fn register_poised_aura(&mut self, sim: &mut Sim, unit: UnitId) {
+        if sim.rules != Rules::Forever {
+            return;
+        }
+        let cost_mod = sim.add_dynamic_mod(
+            unit,
+            SpellModConfig {
+                kind: SpellModType::PowerCostFlat,
+                class_mask: masks::ENERGY_ABILITIES,
+                int_value: -POISED_COST_REDUCTION,
+                ..SpellModConfig::default()
+            },
+        );
+        let aura = sim.register_aura(
+            unit,
+            AuraConfig {
+                label: "Poised".to_string(),
+                action_id: Some(spell_action(POISED_SPELL_ID)),
+                duration: NEVER_EXPIRES,
+                on_gain: Some(Rc::new(move |sim: &mut Sim, _| {
+                    sim.activate_spell_mod(cost_mod);
+                })),
+                on_expire: Some(Rc::new(move |sim: &mut Sim, _| {
+                    sim.deactivate_spell_mod(cost_mod);
+                })),
+                events: EventCallbacks {
+                    on_apply_effects: true,
+                    ..EventCallbacks::default()
+                },
+                ..AuraConfig::default()
+            },
+        );
+        self.auras.poised = Some(aura);
     }
 
     /// Go `registerVanishSpell`.
