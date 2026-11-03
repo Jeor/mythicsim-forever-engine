@@ -3422,6 +3422,11 @@ pub enum Effect {
         trigger_aura: String,
         aura: String,
         aura_duration_ns: i64,
+        /// Forever's rules, from Blizzard's development notes of 2 November 2026: the missiles
+        /// of Arcane Missiles can proc Clearcasting, and a Clearcasting that an Arcane Missiles
+        /// cast finds Missile Barrage up beside is kept. The Go reference does neither.
+        #[serde(default, skip_serializing_if = "is_false")]
+        missiles: bool,
     },
     MissileBarrage {
         trigger_aura: String,
