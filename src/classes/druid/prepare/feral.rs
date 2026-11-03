@@ -34,11 +34,12 @@ const RIP_RANKS: [i32; 6] = [1079, 9492, 9493, 9752, 9894, 9896];
 const BITE_RANKS: [i32; 5] = [22568, 22827, 22828, 22829, 31018];
 const PROWL_RANKS: [i32; 3] = [5215, 6783, 9913];
 
-/// Poised's spell id. The client of 1.60.1.70707 has no row for Poised (the notes of 2 November
-/// 2026 add it for Druids at level 32 beside the Rogue's), so this is a provisional id beyond
-/// every id the client states, next to the Rogue's 1399002, until a client build carries the
-/// real one.
-pub(crate) const POISED_SPELL_ID: i32 = 1_399_003;
+/// Poised's aura, the row of hotfix push 113578 that holds the discount: one charge of -10 Energy
+/// on Claw, Rake, Shred, Ravage, Pounce, Rip, Ferocious Bite and Cower. The passive that grants
+/// it, learned at level 32 ("While at maximum Energy, and out of combat"), is 1328829. Both are
+/// in Wowhead's Forever data and wowsims/forever #836; they replace the provisional id 1399003
+/// the notes of 2 November 2026 needed before the client had a row.
+pub(crate) const POISED_SPELL_ID: i32 = 1_328_827;
 /// The Energy Poised takes off the next Energy ability.
 pub(crate) const POISED_COST_REDUCTION: i32 = 10;
 
@@ -55,18 +56,27 @@ fn weapon_multiplier(rules: Rules, ladder: &Ladder, forever: f64) -> f64 {
 }
 
 /// The notes of 2 November 2026 raise Rip's, Rake's and Ferocious Bite's base damage and attack
-/// power scaling by "about 25%"; no row states the new values yet, so 1.25 stands in for them
-/// (wowsims/forever #823's placeholder too) until the client carries them. Ferocious Bite's
-/// damage from extra Energy keeps its value. 1 for the Go reference.
-pub(super) fn bleed_and_bite_scale(rules: Rules) -> f64 {
+/// power scaling by "about 25%". The live rows state the new base damage (`hotfix_113554`); no
+/// row or tooltip states the attack power shares, which are server side literals (Rip 1% a combo
+/// point up to four, Rake 5%, Ferocious Bite 3% a combo point), so they keep the notes' 25%.
+/// 1 for the Go reference.
+pub(super) fn attack_power_share_scale(rules: Rules) -> f64 {
     match rules {
         Rules::Forever => 1.25,
         Rules::GoReference => 1.0,
     }
 }
 
+/// The row of a cat spell's highest rank under `rules`: the live row under Forever's rules.
+pub(super) fn cat_rank(rules: Rules, ranks: &[i32]) -> &'static Spell {
+    hotfix_113554::row(rules, *ranks.last().expect("ranks"))
+}
+
 /// Rend and Tear's damage multiplier at a rank: 2% a rank in the client rows, 3% a rank under
-/// the development notes of 2 November 2026 (Forever's rules).
+/// the development notes of 2 November 2026 (Forever's rules). Wowhead's Forever tooltip of the
+/// talent spell reads "by 20%" on 4 November, which is the row's own base points (20 in the frozen
+/// data as well, next to a per rank curve of 2 to 10), not a rank value: Genesis, Naturalist and
+/// Predatory Strikes read their row bases the same way, so it is not taken as 4% a rank.
 pub(super) fn rend_and_tear_multiplier(rules: Rules, rank: i32) -> f64 {
     match rules {
         Rules::Forever => 1.0 + 0.03 * f64::from(rank),
@@ -160,10 +170,10 @@ impl Druid {
     }
 
     fn register_rake_spell(&mut self, sim: &mut Sim) {
-        let rank = Ladder::ranked(&RAKE_RANKS).highest();
+        let rank = cat_rank(sim.rules, &RAKE_RANKS);
         let tick = rank.periodic_effect();
         let mut config = melee_special(rank, masks::RAKE, SpellFlag::IGNORE_RESISTS);
-        config.damage_multiplier = bleed_and_bite_scale(sim.rules);
+        config.damage_multiplier = 1.0;
         config.dot = DotConfig {
             aura: AuraConfig {
                 label: "Rake".to_string(),
@@ -178,10 +188,10 @@ impl Druid {
     }
 
     fn register_rip_spell(&mut self, sim: &mut Sim) {
-        let rank = Ladder::ranked(&RIP_RANKS).highest();
+        let rank = cat_rank(sim.rules, &RIP_RANKS);
         let tick = rank.periodic_effect();
         let mut config = melee_special(rank, masks::RIP, SpellFlag::NONE);
-        config.damage_multiplier = bleed_and_bite_scale(sim.rules);
+        config.damage_multiplier = 1.0;
         config.dot = DotConfig {
             aura: AuraConfig {
                 label: "Rip".to_string(),
@@ -195,9 +205,9 @@ impl Druid {
     }
 
     fn register_ferocious_bite_spell(&mut self, sim: &mut Sim) {
-        let rank = Ladder::ranked(&BITE_RANKS).highest();
+        let rank = cat_rank(sim.rules, &BITE_RANKS);
         let mut config = melee_special(rank, masks::FEROCIOUS_BITE, SpellFlag::NONE);
-        config.damage_multiplier = bleed_and_bite_scale(sim.rules);
+        config.damage_multiplier = 1.0;
         self.ferocious_bite = Some(self.register_spell(sim, CAT, config));
     }
 
@@ -698,5 +708,42 @@ impl Druid {
                 timings: Vec::new(),
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Rend and Tear stays 3/6/9/12/15% a rank under Forever's rules (the notes) and 2/4/6/8/10%
+    /// in the reference. The live tooltip's "20%" is the row's own base points, which the frozen
+    /// data holds too, so it is not read as 4% a rank.
+    #[test]
+    fn rend_and_tear_keeps_the_notes_ranks() {
+        for rank in 1..=5 {
+            let forever = rend_and_tear_multiplier(Rules::Forever, rank);
+            assert!((forever - (1.0 + 0.03 * f64::from(rank))).abs() < 1e-12);
+            let reference = rend_and_tear_multiplier(Rules::GoReference, rank);
+            assert!((reference - (1.0 + 0.02 * f64::from(rank))).abs() < 1e-12);
+        }
+        assert_eq!(Ladder::talent(1223246, 5).effect_at(1).value_at(5), 10.0);
+        assert_eq!(
+            crate::prepare::spelldata::must_find(1223246)
+                .effect_n(1)
+                .base_points,
+            20.0
+        );
+    }
+
+    /// The Go reference keeps the frozen rows and shares; Forever's rules read the live rows, and
+    /// only the attack power shares keep the notes' 25%.
+    #[test]
+    fn cat_rows_follow_the_rules() {
+        let live = cat_rank(Rules::Forever, &RIP_RANKS).periodic_effect();
+        assert_eq!(live.average(60), 19.0);
+        let frozen = cat_rank(Rules::GoReference, &RIP_RANKS).periodic_effect();
+        assert_eq!(frozen.average(60), 15.0);
+        assert_eq!(attack_power_share_scale(Rules::Forever), 1.25);
+        assert_eq!(attack_power_share_scale(Rules::GoReference), 1.0);
     }
 }

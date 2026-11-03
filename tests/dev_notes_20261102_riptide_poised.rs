@@ -13,8 +13,8 @@ use std::{fs, path::Path};
 const RIPTIDE_RANKS: [(i64, i64, i64); 3] =
     [(408521, 147, 245), (1239242, 180, 300), (1239243, 231, 385)];
 const RIPTIDE: i64 = 1239243;
-/// The provisional spell id of the Druid's Poised (`prepare::feral`), which no client row states.
-const POISED: i64 = 1_399_003;
+/// The Druid's Poised aura (`prepare::feral`), the row of hotfix push 113578 with the discount.
+const POISED: i64 = 1_328_827;
 const RAVAGE: i64 = 9867;
 /// The live reference builds' talents in Forever's order (the fixtures' strings are the old tree's,
 /// which Forever's rules refuse).
