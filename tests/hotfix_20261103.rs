@@ -6,6 +6,8 @@ use forever_engine::{prepare_json_with, Rules};
 use serde_json::Value;
 use std::{fs, path::Path};
 
+#[path = "support/warrior_trees_20261104.rs"]
+mod warrior_trees_20261104;
 #[path = "support/shaman_layout.rs"]
 mod shaman_layout;
 
@@ -19,6 +21,11 @@ fn request(name: &str) -> Value {
 }
 
 fn prepared(request: &Value, rules: Rules) -> Value {
+    // The fixtures' Warrior talents are the old tree's; Forever's rules read the client's order.
+    let mut request = request.clone();
+    if rules == Rules::Forever {
+        warrior_trees_20261104::forever_request(&mut request);
+    }
     prepare_json_with(request.to_string().as_bytes(), "rust", rules).unwrap()
 }
 

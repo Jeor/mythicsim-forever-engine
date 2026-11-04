@@ -16,6 +16,8 @@ mod paladin_113554;
 mod priest;
 mod proc_oil;
 mod rogue;
+#[path = "../support/rogue_113483.rs"]
+mod rogue_113483;
 mod rotation_targets;
 mod rotation_values;
 mod shaman;
@@ -23,6 +25,8 @@ mod shaman;
 mod shaman_layout;
 mod warlock;
 mod warrior;
+#[path = "../support/warrior_trees_20261104.rs"]
+mod warrior_trees_20261104;
 mod weapon_procs;
 
 /// Each refusal of a valid prepared input: its stable code and its reason.

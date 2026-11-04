@@ -102,12 +102,50 @@ pub(crate) const TRUESHOT_AURA_20261103: [(i32, f64); 5] = [
     (20906, 100.0),
 ];
 
-/// Every Starfire rank (1 to 7).
-pub(crate) const STARFIRE_RANKS: [i32; 7] = [2912, 8949, 8950, 8951, 9875, 9876, 25298];
+/// Starfire ranks 1 to 7 as Wowhead's Forever tooltips read them from the live client on 4
+/// November 2026 (the notes of 2 November say "about 40%" more): the base points and the points
+/// per level of the damage effect, as (spell, base points, points per level). Rank 7 (25298)
+/// reads 533 on its spell page and a tooltip of 510 to 597 at its level 66 cap (533 plus 6 times
+/// 3.4, spread by the row's unchanged variance). Before: 81, 110, 144, 198, 266, 337 and 381 with
+/// 1.3, 1.5, 1.6, 1.8, 2.2, 2.3 and 2.4 a level.
+pub(crate) const STARFIRE_LIVE_20261104: [(i32, f64, f64); 7] = [
+    (2912, 113.0, 1.8),
+    (8949, 154.0, 2.1),
+    (8950, 201.0, 2.2),
+    (8951, 277.0, 2.5),
+    (9875, 372.0, 3.0),
+    (9876, 471.0, 3.2),
+    (25298, 533.0, 3.4),
+];
 
-/// Starfire's damage under the development notes of 2 November 2026: "about 40%" more, which no
-/// row states yet.
-pub(crate) const STARFIRE_NOTES_SCALE: f64 = 1.4;
+/// Rip rank 6 (9896) as the live client states it on 4 November 2026: 19 a tick (was 15) and
+/// 31.9 more a tick per combo point (was 25.5), on SpellEffect 688085. The tooltip's 305, 497,
+/// 688, 880 and 1071 over 12 sec are six ticks of 19 + 31.9 a point, and the buff tooltip reads
+/// "19 + (32 * Combo Points)" every 2 sec.
+pub(crate) const RIP_LIVE_20261104: (f64, f32) = (19.0, 31.9);
+
+/// Rake rank 4 (9904) as the live client states it: a hit of 76 (was 61, SpellEffect 687442) and a
+/// bleed of 42 every 3 sec (was 34, SpellEffect 687443), "76 damage plus 126 over 9 sec".
+pub(crate) const RAKE_LIVE_20261104: (f64, f64) = (76.0, 42.0);
+
+/// Ferocious Bite rank 5 (31018) as the live client states it: a roll of 102 (was 82,
+/// SpellEffect 705079) spread over 76 (the tooltip's 245 to 321 at one combo point is 102 plus 181
+/// plus or minus 38), 181 more a combo point (was 147) and 330 for the dummy that sets the damage
+/// of each extra Energy (was 270, SpellEffect 1277241), "3.3 additional damage".
+pub(crate) const FEROCIOUS_BITE_LIVE_20261104: FerociousBiteRow = FerociousBiteRow {
+    base_points: 102.0,
+    spread: 76.0,
+    points_per_combo_point: 181.0,
+    energy_dummy: 330.0,
+};
+
+/// See [`FEROCIOUS_BITE_LIVE_20261104`].
+pub(crate) struct FerociousBiteRow {
+    pub(crate) base_points: f64,
+    pub(crate) spread: f64,
+    pub(crate) points_per_combo_point: f32,
+    pub(crate) energy_dummy: f64,
+}
 
 /// Talents whose per rank values Blizzard's development notes of 2 November 2026 change while
 /// keeping the rank count, as the curve each takes under Forever's rules: one row per effect, in
@@ -144,6 +182,19 @@ const TALENT_CURVES_20261102: &[(i32, &[&[f64]])] = &[
     // Rogue: Aggression 5/10/15% (was 2/4/6%), on Sinister Strike and Eviscerate only; the mask
     // is in the Rogue's registration.
     (18427, &[&[5.0, 10.0, 15.0]]),
+    // Rogue (the rework of pushes 113351 and 113483, client 1.60.1.70755 with hotfixes to push
+    // 113583): Lethality 10/20% (two ranks, was 4 to 20% in five), Seal Fate 33/66/100% (three
+    // ranks, was 20 to 100% in five), Opportunity 4 to 20% on both its effects (five ranks, was
+    // 5/10%) and Dual Wield Specialization 25/50% (two ranks, was 5 to 25% in five). The
+    // TraitDefinition curves of wowsims/forever #840's store; Wowhead's calculator states the
+    // same texts.
+    (14128, &[&[10.0, 20.0]]),
+    (14186, &[&[33.0, 66.0, 100.0]]),
+    (
+        14057,
+        &[&[4.0, 8.0, 12.0, 16.0, 20.0], &[4.0, 8.0, 12.0, 16.0, 20.0]],
+    ),
+    (13715, &[&[25.0, 50.0]]),
 ];
 
 /// A talent's ladder under `rules`: the curve of [`TALENT_CURVES_20261102`] under Forever's rules
@@ -387,16 +438,33 @@ fn build() -> HashMap<i32, &'static Spell> {
         patch(spell, &|row| effect(row, id).base_points = points);
     }
 
-    // Druid (development notes of 2 November): Starfire's base damage "increased by about 40%".
-    // No row states the new values yet, so every rank's damage (base points and points per
-    // level) is scaled by [`STARFIRE_NOTES_SCALE`], a placeholder until the client carries them.
-    for id in STARFIRE_RANKS {
+    // Druid (the live client of 4 November, which carries the notes of 2 November): every Starfire
+    // rank's base damage and damage per level ("about 40%" more), Rip, Rake and Ferocious Bite.
+    // The attack power shares no row states stay with the druid's preparation.
+    for (id, base_points, ppl) in STARFIRE_LIVE_20261104 {
         patch(id, &|row| {
             let damage = &mut row.effects[0];
-            damage.base_points *= STARFIRE_NOTES_SCALE;
-            damage.ppl *= STARFIRE_NOTES_SCALE;
+            damage.base_points = base_points;
+            damage.ppl = ppl;
         });
     }
+    patch(9896, &|row| {
+        let tick = effect(row, 688085);
+        tick.base_points = RIP_LIVE_20261104.0;
+        tick.points_per_resource = RIP_LIVE_20261104.1;
+    });
+    patch(9904, &|row| {
+        effect(row, 687442).base_points = RAKE_LIVE_20261104.0;
+        effect(row, 687443).base_points = RAKE_LIVE_20261104.1;
+    });
+    patch(31018, &|row| {
+        let bite = FEROCIOUS_BITE_LIVE_20261104;
+        let roll = effect(row, 705079);
+        roll.base_points = bite.base_points;
+        roll.variance = bite.spread / bite.base_points;
+        roll.points_per_resource = bite.points_per_combo_point;
+        effect(row, 1277241).base_points = bite.energy_dummy;
+    });
 
     // Warrior (notes of 2 November): Defensive Stance's threat bonus 30% to 80% (Defensive Stance
     // Passive, SpellEffect 686475), and Slam's 18 sec cooldown to 15 on every rank.
@@ -559,8 +627,45 @@ mod tests {
             assert!(!must_find(id).heal_effect().is_nil(), "{id}");
         }
         assert_eq!(must_find(1239243).powers[0].cost, 385);
-        let starfire = hotfixed(9876).unwrap();
-        assert!((starfire.effects[0].base_points - 337.0 * 1.4).abs() < 1e-9);
+        for (id, base_points, ppl) in STARFIRE_LIVE_20261104 {
+            let starfire = hotfixed(id).unwrap();
+            assert_eq!(starfire.effects[0].base_points, base_points, "{id}");
+            assert_eq!(starfire.effects[0].ppl as f32, ppl as f32, "{id}");
+            assert_ne!(must_find(id).effects[0].base_points, base_points, "{id}");
+        }
+        assert_eq!(hotfixed(9896).unwrap().effect_n(1).base_points, 19.0);
+        assert_eq!(must_find(9896).effect_n(1).base_points, 15.0);
+        assert_eq!(hotfixed(9904).unwrap().effect_n(1).base_points, 76.0);
+        assert_eq!(hotfixed(9904).unwrap().effect_n(2).base_points, 42.0);
+        assert_eq!(hotfixed(31018).unwrap().effect_n(1).base_points, 102.0);
+        assert_eq!(hotfixed(31018).unwrap().effect_n(2).base_points, 330.0);
+    }
+
+    /// Starfire's rows reproduce Wowhead's live tooltips of 4 November, which show each rank at its
+    /// level cap: the average is the tooltip's middle and the spread is the row's variance of the
+    /// base at the rank's own level, 510 to 597 for rank 7 (533 plus 6 levels of 3.4, 87 wide).
+    #[test]
+    fn starfire_rows_reproduce_the_live_tooltips() {
+        let tooltips = [
+            (2912, 111.0, 133.0),
+            (8949, 151.0, 182.0),
+            (8950, 196.0, 232.0),
+            (8951, 268.0, 316.0),
+            (9875, 359.0, 421.0),
+            (9876, 451.0, 529.0),
+            (25298, 510.0, 597.0),
+        ];
+        for (id, low, high) in tooltips {
+            let damage = &row(Rules::Forever, id).effects[0];
+            let at_cap = damage.average(i32::from(damage.max_level));
+            let spread = damage.variance * damage.average(i32::from(damage.spell_level));
+            assert!(
+                ((low + high) / 2.0 - at_cap).abs() <= 0.5,
+                "{id} middle {at_cap}"
+            );
+            assert!((at_cap - spread / 2.0 - low).abs() <= 1.0, "{id} low");
+            assert!((at_cap + spread / 2.0 - high).abs() <= 1.0, "{id} high");
+        }
     }
 
     /// The rows' base points and levels reproduce the damage ranges of Wowhead's Forever
