@@ -89,7 +89,10 @@ pub(super) fn decode_message(
         };
         fields.insert(field.number, decoded);
     }
-    Ok(Message { schema, fields })
+    Ok(Message {
+        schema,
+        fields: fields.into(),
+    })
 }
 
 fn is_default(value: &Value) -> bool {
