@@ -36,8 +36,28 @@ ROWS = [
     ("Sniper Shot rank 3", 1310786, 1340619, "BasePoints", 590, 295),
     ("Aspect of the Hawk rank 6", 14322, 692138, "BasePoints", 110, 55),
     ("Trueshot Aura rank 5", 20906, 697683, "BasePoints", 100, 50),
-    ("Starfire rank 6 (placeholder: notes say about 40%)", 9876, 688325, "BasePoints",
-     337 * 1.4, 337),
+    ("Starfire rank 1 base", 2912, 680527, "BasePoints", 113, 81),
+    ("Starfire rank 2 base", 8949, 685525, "BasePoints", 154, 110),
+    ("Starfire rank 3 base", 8950, 687888, "BasePoints", 201, 144),
+    ("Starfire rank 4 base", 8951, 685632, "BasePoints", 277, 198),
+    ("Starfire rank 5 base", 9875, 687806, "BasePoints", 372, 266),
+    ("Starfire rank 6 base", 9876, 688325, "BasePoints", 471, 337),
+    ("Starfire rank 7 base", 25298, 702704, "BasePoints", 533, 381),
+    ("Starfire rank 1 a level", 2912, 680527, "PPL", 1.8, 1.3),
+    ("Starfire rank 2 a level", 8949, 685525, "PPL", 2.1, 1.5),
+    ("Starfire rank 3 a level", 8950, 687888, "PPL", 2.2, 1.6),
+    ("Starfire rank 4 a level", 8951, 685632, "PPL", 2.5, 1.8),
+    ("Starfire rank 5 a level", 9875, 687806, "PPL", 3.0, 2.2),
+    ("Starfire rank 6 a level", 9876, 688325, "PPL", 3.2, 2.3),
+    ("Starfire rank 7 a level", 25298, 702704, "PPL", 3.4, 2.4),
+    ("Rip rank 6 tick", 9896, 688085, "BasePoints", 19, 15),
+    ("Rip rank 6 tick a combo point", 9896, 688085, "PointsPerResource", 31.9, 25.5),
+    ("Rake rank 4 hit", 9904, 687442, "BasePoints", 76, 61),
+    ("Rake rank 4 tick", 9904, 687443, "BasePoints", 42, 34),
+    ("Ferocious Bite roll", 31018, 705079, "BasePoints", 102, 82),
+    ("Ferocious Bite roll spread (76 over 102)", 31018, 705079, "Variance", 76 / 102, 0.7317073),
+    ("Ferocious Bite a combo point", 31018, 705079, "PointsPerResource", 181, 147),
+    ("Ferocious Bite extra Energy (330 for 3.3)", 31018, 1277241, "BasePoints", 330, 270),
     ("Shred weapon damage %", 9830, 688179, "BasePoints", 200, 155),
     ("Claw weapon damage %", 9850, 687219, "BasePoints", 140, 110),
     ("Ravage weapon damage %", 9867, 687812, "BasePoints", 435, 350),
@@ -76,6 +96,11 @@ ROWS = [
     ("Venom aura poison chance (flat, last effect)", 1310703, 1340418, "BasePoints", 20, None),
     ("Boot Knife Combo Points", 1329285, 1368713, "BasePoints", 2, None),
     ("Relentless Strikes Energy", 14181, 691778, "BasePoints", 25, None),
+    ("Spearing Strike weapon damage %", 1310222, 1339573, "BasePoints", 75, 40),
+    ("Spearing Strike bonus against Giants and Dragonkin (times)", 1310222, 1339768, "BasePoints", 1, 2),
+    ("Bloodthirst rank 4 attack power share % (unchanged)", 23894, 1339740, "BasePoints", 45, 45),
+    ("Reckless Swings cooldown (ms)", 1329555, None, "CooldownMs", 15000, 0),
+    ("Reckless Swings charges' Rage (tenths)", 1329554, 1369166, "BasePoints", 50, 0),
 ]
 
 # (label, spell id, power cost field, Forever's value, frozen value): see POWERS below.
@@ -88,6 +113,7 @@ POWERS = [
     ("Shank rank 2 Energy cost", 1329549, "Cost", 5, None),
     ("Death Mark rank 4 Energy cost", 1325758, "Cost", 25, None),
     ("Mutilate rank 3 Energy cost", 1241584, "Cost", 60, 60),
+    ("Reckless Swings health cost (% of base health)", 1329555, "CostPct", 25, 0),
 ]
 
 # (label, spell id, Forever's value, frozen value): the stacks an aura row states.
@@ -129,14 +155,27 @@ TALENTS = [
     ("Boot Knife chance", 1329286, 0, [20, 40, 60, 80, 100], None),
     ("Blood Splatter Rupture (ms)", 1329256, 0, [6000], None),
     ("Blood Splatter Garrote (ms)", 1329256, 1, [9000], None),
+    ("Flurry (Warrior)", 12319, 0, [10, 20, 30], [5, 10, 15, 20, 25]),
+    ("Improved Tactical Mastery", 12295, 0, [5, 10, 15], [3, 6, 9, 12, 15]),
+    ("Bloodthrill", 1289682, 0, [10, 20], [4, 8, 12, 16, 20]),
+    ("Improved Whirlwind cooldown (ms)", 1310315, 0, [-1000, -2000], []),
+    ("Improved Whirlwind closest enemy damage", 1310315, 1, [15, 30], []),
+    ("Furious Precision (unchanged)", 1323963, 0, [4, 7, 10], [4, 7, 10]),
 ]
 
 NOT_IN_DATA = [
+    ("Defensive Stance threat 80% and Defiance 7/13/20% (Warrior)",
+     "no row yet: the 4 November store still states 30 (effect 686475) and 5/10/15, and Wowhead's "
+     "tooltips read 30% and 15%; Forever's rules keep the notes' values until a row or a blue post "
+     "says otherwise"),
+    ("Gore Drinker and Lingering Rage (Warrior)",
+     "healing and the Rage decay out of combat, which the sim does not model"),
     ("Riptide has no initial heal, only the heal over time",
      "the tooltip names a heal and a heal over time; the first effect leaves the row as a heal"),
     ("Poised for Druids (level 32, 10 Energy off the next Energy ability out of combat)",
-     "no client row yet: Forever's rules use the provisional id 1399003; replace it once a client "
-     "build carries the spell"),
+     "ids 1328829 (passive) and 1328827 (the -10 Energy aura, one charge) are in the store since "
+     "hotfix push 113578; the engine's rule that the fight starts at maximum Energy, out of "
+     "combat, is not in a row"),
     ("Instant Poison 1% and Deadly Poison 0.9% a tick of attack power",
      "poison hits at two attack power values: each grows 0.01 and 0.009 a point (a stack for Deadly)"),
     ("Shank: never missed, dodged or parried; only blocked or critical",
@@ -153,8 +192,15 @@ NOT_IN_DATA = [
      "Arcane Shot on a training dummy at two ranged attack power values: the damage grows 0.15 a point"),
     ("Serpent Sting 5% of ranged attack power a tick",
      "Serpent Sting ticks at two ranged attack power values: each tick grows 0.05 a point"),
-    ("Rip, Rake, Ferocious Bite and Pounce about 25% (placeholder 1.25)",
-     "tooltips or ticks at a known attack power, then replace the placeholder with the rows"),
+    ("Rip 1% a combo point (up to four), Rake 5% and Ferocious Bite 3% a combo point of attack "
+     "power, each times the notes' 1.25",
+     "no row or tooltip states the shares (server side): ticks and hits at two attack power "
+     "values, the damage grows by the share a point"),
+    ("Pounce rank 3 bleed 31 a tick (186 over 18 sec, was 25)",
+     "the engine does not cast Pounce; its bleed row 9826 reads 25 in the frozen data"),
+    ("Rend and Tear 3/6/9/12/15% (Wowhead's talent spell tooltip reads 20% at 5/5)",
+     "the tooltip prints the row's own base points, 20 in the frozen data too; the trait curve "
+     "check above reads the per rank value"),
     ("Bear Form threat 215%", "threat meter on a dummy with a known damage hit"),
     ("Maelstrom Weapon chance doubled (20 PPM)",
      "count stacks over a few minutes of melee with a known weapon speed"),

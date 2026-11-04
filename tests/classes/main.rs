@@ -23,6 +23,8 @@ mod rotation_values;
 mod shaman;
 mod warlock;
 mod warrior;
+#[path = "../support/warrior_trees_20261104.rs"]
+mod warrior_trees_20261104;
 mod weapon_procs;
 
 /// Each refusal of a valid prepared input: its stable code and its reason.

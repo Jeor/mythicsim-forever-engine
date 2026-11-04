@@ -291,7 +291,7 @@ impl Warrior {
                 callback: CallbackMask::ON_SPELL_HIT_DEALT,
                 proc_mask: ProcMask::MELEE_MH,
                 outcome: HitOutcome::LANDED,
-                proc_chance: spell_data().bloodthrill.fraction_at(rank),
+                proc_chance: super::super::trees_20261104::bloodthrill(sim.rules).fraction_at(rank),
                 ..ProcTrigger::default()
             },
         );

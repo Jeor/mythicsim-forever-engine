@@ -4297,6 +4297,10 @@ pub enum Effect {
         spell_id: i32,
         off_hand: bool,
         max_targets: i32,
+        /// Improved Whirlwind (Forever's rules): the share more damage the first target of each
+        /// strike takes, the closest enemy; its dummy effect.
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        closest_bonus: f64,
     },
     /// Execute: a base plus damage for each extra rage it spends.
     Execute {
@@ -4419,6 +4423,18 @@ pub enum Effect {
         /// hit spends one, Heroic Strike and Cleave included.
         #[serde(default, skip_serializing_if = "is_false")]
         every_swing_spends: bool,
+    },
+    /// Reckless Swings (Forever's rules, the notes of 2 November 2026): a cast for a share of
+    /// base health that gives the aura `charges` stacks, each landed white swing a spell batch
+    /// window later giving `rage` and spending one.
+    RecklessSwings {
+        spell_id: i32,
+        aura: String,
+        trigger_aura: String,
+        rage: f64,
+        charges: i32,
+        health_cost: f64,
+        delay_ns: i64,
     },
     /// Anger Management: rage every period from the reset.
     AngerManagement {
@@ -5571,6 +5587,7 @@ impl Effect {
             Effect::DeepWounds { .. } => "deep_wounds",
             Effect::UnbridledWrath { .. } => "unbridled_wrath",
             Effect::WarriorFlurry { .. } => "warrior_flurry",
+            Effect::RecklessSwings { .. } => "reckless_swings",
             Effect::AngerManagement { .. } => "anger_management",
             Effect::HeroicStrikeQueue { .. } => "heroic_strike_queue",
             Effect::OverpowerWindow { .. } => "overpower_window",
