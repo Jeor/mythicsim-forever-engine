@@ -1,0 +1,409 @@
+{
+ "raid": {
+  "buffs": {
+   "giftOfTheWild": true,
+   "prayerOfSpirit": true,
+   "arcaneBrilliance": true
+  },
+  "debuffs": {
+   "faerieFire": true,
+   "exposeArmor": true,
+   "huntersMark": true,
+   "sunderArmor": true,
+   "giftOfArthas": true,
+   "curseOfElements": true,
+   "judgementOfWisdom": true,
+   "curseOfRecklessness": true
+  },
+  "parties": [
+   {
+    "buffs": {
+     "battleShout": "TristateEffectRegular",
+     "moonkinAura": true,
+     "windfuryTotem": true,
+     "graceOfAirTotem": true,
+     "leaderOfThePack": true,
+     "manaSpringTotem": "TristateEffectRegular",
+     "strengthOfEarthTotem": true
+    },
+    "players": [
+     {
+      "name": "hunter-turret",
+      "race": "RaceNightElf",
+      "buffs": {
+       "greaterBlessingOfKings": true,
+       "greaterBlessingOfMight": true,
+       "greaterBlessingOfWisdom": true
+      },
+      "class": "ClassHunter",
+      "hunter": {
+       "options": {
+        "classOptions": {
+         "ammo": "ThoriumHeadedArrow",
+         "petType": "Cat",
+         "petUptime": 1,
+         "quiverBonus": "Speed15",
+         "petAttackSpeed": "OneTwo"
+        }
+       }
+      },
+      "rotation": {
+       "type": "TypeAPL",
+       "priorityList": [
+        {
+         "action": {
+          "autocastOtherCooldowns": {}
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 14295
+           }
+          },
+          "condition": {
+           "cmp": {
+            "op": "OpGe",
+            "lhs": {
+             "numberTargets": {}
+            },
+            "rhs": {
+             "const": {
+              "val": "4"
+             }
+            }
+           }
+          }
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 3045
+           }
+          },
+          "condition": {
+           "cmp": {
+            "op": "OpLt",
+            "lhs": {
+             "spellTimeToReady": {
+              "spellId": {
+               "spellId": 20904
+              }
+             }
+            },
+            "rhs": {
+             "const": {
+              "val": "0.5"
+             }
+            }
+           }
+          }
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 20904
+           }
+          }
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 2643
+           }
+          }
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 25295
+           }
+          },
+          "condition": {
+           "and": {
+            "vals": [
+             {
+              "cmp": {
+               "op": "OpLt",
+               "lhs": {
+                "dotRemainingTime": {
+                 "spellId": {
+                  "spellId": 25295
+                 }
+                }
+               },
+               "rhs": {
+                "const": {
+                 "val": "1s"
+                }
+               }
+              }
+             },
+             {
+              "cmp": {
+               "op": "OpGe",
+               "lhs": {
+                "currentManaPercent": {}
+               },
+               "rhs": {
+                "const": {
+                 "val": "30%"
+                }
+               }
+              }
+             }
+            ]
+           }
+          }
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 1293527
+           }
+          }
+         }
+        }
+       ],
+       "prepullActions": [
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 25296
+           }
+          }
+         },
+         "doAtValue": {
+          "const": {
+           "val": "-10s"
+          }
+         }
+        },
+        {
+         "action": {
+          "castSpell": {
+           "spellId": {
+            "spellId": 20904
+           }
+          }
+         },
+         "doAtValue": {
+          "const": {
+           "val": "-2.5s"
+          }
+         }
+        }
+       ]
+      },
+      "equipment": {
+       "items": [
+        {
+         "id": 252605,
+         "enchant": 1508
+        },
+        {
+         "id": 15411,
+         "enchant": 904
+        },
+        {
+         "id": 12927
+        },
+        {
+         "id": 13340,
+         "enchant": 7667
+        },
+        {
+         "id": 252483,
+         "enchant": 1891
+        },
+        {
+         "id": 16681,
+         "enchant": 1883
+        },
+        {
+         "id": 16676,
+         "enchant": 1887
+        },
+        {
+         "id": 272397
+        },
+        {
+         "id": 16678,
+         "enchant": 1508
+        },
+        {
+         "id": 13967,
+         "enchant": 1887
+        },
+        {
+         "id": 18500
+        },
+        {
+         "id": 18500
+        },
+        {
+         "id": 18520,
+         "enchant": 723
+        },
+        {
+         "id": 13023,
+         "enchant": 664
+        }
+       ]
+      },
+      "bonusStats": {
+       "stats": [
+        0,
+        20,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "consumables": {
+       "potId": 250953,
+       "flaskId": 13512,
+       "potions": [
+        250953
+       ],
+       "zanzaId": 8412,
+       "alcoholId": 21151,
+       "conjuredId": 12662,
+       "conjuredItems": [
+        12662
+       ],
+       "battleElixirId": 250328,
+       "strengthBuffId": 12451,
+       "guardianElixirId": 250338,
+       "attackPowerBuffId": 12460,
+       "dragonbreathChili": true,
+       "spellPowerElixirId": 13454
+      },
+      "profession1": "Engineering",
+      "talentsString": "5320001505101251-00530520014",
+      "reactionTimeMs": 100,
+      "distanceFromTarget": 12
+     }
+    ]
+   }
+  ]
+ },
+ "encounter": {
+  "targets": [
+   {
+    "id": 213336,
+    "name": "Level 60",
+    "level": 63,
+    "stats": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     805,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     3731,
+     0,
+     127393,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "canCrush": true,
+    "parryHaste": true,
+    "swingSpeed": 2,
+    "damageSpread": 0.3333,
+    "minBaseDamage": 3000
+   }
+  ],
+  "duration": 120,
+  "noHitSuppression": true,
+  "durationVariation": 15,
+  "executeProportion20": 0.2,
+  "executeProportion25": 0.25,
+  "executeProportion35": 0.35,
+  "executeProportion45": 0.45,
+  "executeProportion90": 0.9
+ },
+ "simOptions": {
+  "iterations": 20,
+  "randomSeed": "1179706472",
+  "debugFirstIteration": true
+ }
+}

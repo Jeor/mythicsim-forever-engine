@@ -1130,6 +1130,10 @@ pub(crate) fn export_state(
         // A damage bonus applied after the calculation is damage the target takes, so threat
         // (README, Rust-only mechanics); the reference kept the threat of the damage before it.
         prepared["player"]["threat_follows_damage_bonus"] = json!(true);
+        // A cast begun before the pull finishes on the pull at the earliest, as a player times a
+        // precast (README, Rust-only mechanics); the reference finishes a hasted precast early
+        // and drops its damage, which lands before 0:00.
+        prepared["player"]["prepull_casts_finish_on_pull"] = json!(true);
         // A healer sim counts only the share of each heal real healers do not overheal
         // (README, Rust-only mechanics); the reference counts every heal in full.
         let overheal = super::overheal::export(&player_message, &prepared["player"]["spells"]);

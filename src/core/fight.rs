@@ -2011,6 +2011,8 @@ pub(crate) struct Fight<A: Agent> {
     pub(crate) melee_keeps_auto_shot_timer: bool,
     /// Forever's rule that a move whose end time has come reads as arrived.
     pub(crate) move_arrives_at_destination: bool,
+    /// Forever's rule that a cast begun before the pull finishes on the pull at the earliest.
+    pub(crate) prepull_casts_finish_on_pull: bool,
     /// Forever's rule that a rotation with a Move keeps looking through the global cooldown:
     /// set only while the rule is on and the rotation holds a Move.
     pub(crate) rotation_with_moves_looks_through_gcd: bool,
@@ -4249,6 +4251,7 @@ impl<A: Agent> Fight<A> {
             move_waits_for_queued_cast: player.move_waits_for_queued_cast,
             melee_keeps_auto_shot_timer: player.melee_keeps_auto_shot_timer,
             move_arrives_at_destination: player.move_arrives_at_destination,
+            prepull_casts_finish_on_pull: player.prepull_casts_finish_on_pull,
             rotation_with_moves_looks_through_gcd: player.rotation_with_moves_looks_through_gcd,
             off_hand_waits_from_attack_start: player.off_hand_waits_from_attack_start,
             autocast_skips_unready_cooldowns: player.autocast_skips_unready_cooldowns,
@@ -5744,9 +5747,14 @@ impl<A: Agent> Fight<A> {
             };
             self.schedule(at, PRIORITY_PREPULL + count - index as i32, action);
         }
-        self.schedule(0, PRIORITY_PREPULL + count + 1, Action::EncounterStart);
+        self.schedule(0, self.encounter_start_priority(), Action::EncounterStart);
         while self.step() {}
         self.cleanup();
+    }
+
+    /// The priority of the pull at 0:00: after every prepull action at the same time.
+    pub(crate) fn encounter_start_priority(&self) -> i32 {
+        PRIORITY_PREPULL + self.prepull.len() as i32 + 1
     }
 
     /// Go `Simulation.reset` and `Environment.reset`.

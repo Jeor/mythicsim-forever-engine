@@ -599,6 +599,14 @@ the Go goldens and exporter uses. The departures:
   Incinerate on an Immolated target raise a hit's damage after its threat is worked out; the
   reference keeps the threat of the damage before the bonus, so Mind Flay made about 0.82
   threat per damage with no threat talents.
+- A precast lands on the pull (`prepull_casts_finish_on_pull`, Forever preparation), from
+  SimulationCraft, which executes its one harmful precombat action at 0:00 with its cast time
+  skipped (docs/prepull-damage.md). A cast begun before the pull that haste or an early press
+  would finish before 0:00 finishes on 0:00, ahead of the pull's first swings and rotation, as a
+  player times a precast to the pull. The reference, like wowsims, finishes it early and drops
+  its damage, which lands before 0:00: a Skyborne Balance Druid's 2% haste finished the -3.0 s
+  Starfire at -0.06 s and lost its 1,533 damage, and the Hunter turret board's Aimed Shot at
+  -2.5 s finished at -0.76 s for every race. Damage before 0:00 is still never counted.
 - The Paladin tree and Holy Binding of live server hotfix push 113554 (30 October 2026, applied
   to client 1.60.1.70707 by DBCache, which wago.tools' tables do not carry), from upstream
   wowsims/forever #772 and #773's regenerated rows and Wowhead's Forever talent data (Forever

@@ -638,7 +638,13 @@ impl<A: Agent> Fight<A> {
             if self.log.is_some() && !self.spells[spell].flags.no_logs {
                 self.log_casting(spell);
             }
-            let expires = self.now + cur.cast_time;
+            let mut expires = self.now + cur.cast_time;
+            // Forever's rule: a precast that haste or an early press would finish before the pull
+            // finishes on it, as a player times a precast to land as the fight starts; damage
+            // before 0:00 is never counted (docs/prepull-damage.md).
+            if self.prepull_casts_finish_on_pull && expires < 0 {
+                expires = 0;
+            }
             self.changed(super::reads::CASTS);
             self.unit_mut(side).hardcast = super::Hardcast {
                 expires,
@@ -1251,7 +1257,14 @@ impl<A: Agent> Fight<A> {
             self.queue.cancel(action);
         }
         let expires = self.unit(side).hardcast.expires;
-        let action = self.schedule(expires, PRIORITY_GCD, Action::Hardcast(side));
+        // Under Forever's rule a precast that finishes on the pull lands before the encounter
+        // starts, so the pull's first swings and rotation see it done.
+        let priority = if self.prepull_casts_finish_on_pull && self.now < 0 && expires == 0 {
+            self.encounter_start_priority() + 1
+        } else {
+            PRIORITY_GCD
+        };
+        let action = self.schedule(expires, priority, Action::Hardcast(side));
         self.unit_mut(side).hardcast_action = Some(action);
     }
 
