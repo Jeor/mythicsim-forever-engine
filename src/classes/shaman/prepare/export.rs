@@ -29,6 +29,14 @@ use super::spell_data::spell_data;
 use super::spells::{chain_lightning_overload_ranks, lightning_bolt_overload_ranks, rules_row};
 use super::{Shaman, CAST_TAG_LIGHTNING_OVERLOAD};
 
+/// Magma Totem's pulse radius around the totem: 10581's area (SpellRadius 8 yards, client
+/// 1.60.1.70755). The engine's rows do not carry the radius of this effect.
+const MAGMA_TOTEM_RADIUS: f64 = 8.0;
+
+/// Fire Nova's radius around the active fire totem: 408428's area (SpellRadius 10 yards, client
+/// 1.60.1.70755).
+const FIRE_NOVA_RADIUS: f64 = 10.0;
+
 fn nanos(d: Duration) -> i64 {
     d
 }
@@ -189,19 +197,32 @@ impl Shaman {
         }
         // fire_totems.go registerFireNovaSpell: one hit on each target from the nova's damage
         // row average.
-        effects.push(json!({
+        let nova = data.fire_nova_triggered.by_id(408428);
+        let mut fire_nova = json!({
             "kind": "fire_nova", "spell_id": data.fire_nova.highest().id,
-            "base_damage": data.fire_nova_triggered.by_id(408428).damage_effect().average(CHARACTER_LEVEL),
-        }));
+            "base_damage": nova.damage_effect().average(CHARACTER_LEVEL),
+        });
+        // Forever's rules: "enemies within 10 yd of your active Fire totem" (408341's tooltip).
+        // The reference hits every target.
+        if sim.rules == Rules::Forever {
+            fire_nova["radius_yards"] = json!(FIRE_NOVA_RADIUS);
+        }
+        effects.push(fire_nova);
         // fire_totems.go registerSearingTotemSpell: a target dot whose ticks cast the attack.
         let searing = data.searing_totem.highest();
         let searing_attack = data.searing_totem_triggered.highest();
-        effects.push(json!({
+        let mut searing_totem = json!({
             "kind": "searing_totem", "spell_id": searing.id, "attack_spell_id": searing_attack.id,
             "attack_damage": searing_attack.damage_effect().average(CHARACTER_LEVEL),
             "magma_totem_aura": "Magma Totem", "flametongue_totem_aura": "Flametongue Totem (Self)",
             "duration_ns": nanos(searing.duration()),
-        }));
+        });
+        // Forever's rules: the totem "repeatedly attacks an enemy within 20 yards" (10438's
+        // tooltip, 10436's range) of where it stands. The reference attacks at any distance.
+        if sim.rules == Rules::Forever {
+            searing_totem["attack_range_yards"] = json!(f64::from(searing_attack.max_range));
+        }
+        effects.push(searing_totem);
         // shocks.go registerEarthShockSpell and registerFrostShockSpell.
         effects.push(json!({"kind": "earth_shock", "spell_id": data.earth_shock.highest().id}));
         effects.push(json!({"kind": "frost_shock", "spell_id": data.frost_shock.highest().id}));
@@ -399,12 +420,19 @@ impl Shaman {
         // registerMagmaTotemSpell: an area dot on the shaman whose pulses roll hit and crit on
         // each target from the pulse's damage row average.
         let magma = data.magma_totem.highest();
-        effects.push(json!({
+        let pulse = data.magma_totem_triggered.by_id(10581);
+        let mut magma_totem = json!({
             "kind": "magma_totem", "spell_id": magma.id,
-            "pulse_damage": data.magma_totem_triggered.by_id(10581).damage_effect().average(CHARACTER_LEVEL),
+            "pulse_damage": pulse.damage_effect().average(CHARACTER_LEVEL),
             // Trial by Fire (client 70425) lengthens it.
             "duration_ns": nanos(magma.duration() + super::spells::magma_totem_bonus(self.talent("trial_by_fire"))),
-        }));
+        });
+        // Forever's rules: the totem stands "at the feet of the caster" and burns "creatures
+        // within 8 yards" (10587's tooltip). The reference hits every target.
+        if sim.rules == Rules::Forever {
+            magma_totem["radius_yards"] = json!(MAGMA_TOTEM_RADIUS);
+        }
+        effects.push(magma_totem);
         // registerLightningShieldSpell: the cast puts up every charge. Its trigger hears only
         // the shield self proc, which needs a proc rate the exporter rejects, so the orb never
         // fires.
@@ -547,6 +575,14 @@ impl Shaman {
                         "proc_expire_log": format!("Lost {} from fading {}.", flat_string(&bonus), action_id_string(&proc_id)),
                         "contested": party_windfury || imbue_on_main_hand,
                     }));
+                    // Forever's rules: the party's totem and the shaman's own both give aura
+                    // 10612, which does not stack, and a main hand Windfury Weapon "disables any
+                    // benefit you personally receive from Windfury Totem" (every rank's
+                    // tooltip). So the own totem adds nothing beside either.
+                    if sim.rules == Rules::Forever {
+                        let last = effects.len() - 1;
+                        effects[last]["one_aura"] = json!(true);
+                    }
                 }
                 _ => notes.push(
                     "Windfury Totem (Self) is not the shape the runtime implements".to_string(),

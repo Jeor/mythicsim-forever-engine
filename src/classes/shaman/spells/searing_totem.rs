@@ -12,6 +12,9 @@ pub(crate) struct SearingTotem {
     /// Totem's aura.
     pub(crate) magma_totem: Option<AuraRef>,
     pub(crate) flametongue_totem: Option<AuraRef>,
+    /// Under Forever's rules the attack's range from where the totem stands; zero reaches any
+    /// target.
+    pub(crate) attack_range: f64,
 }
 
 /// The totem's ApplyEffects.
