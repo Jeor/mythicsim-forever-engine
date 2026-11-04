@@ -968,6 +968,12 @@ pub struct Player {
     /// which kept the threat of the damage before the bonus.
     #[serde(default, skip_serializing_if = "is_false")]
     pub threat_follows_damage_bonus: bool,
+    /// Forever's rule: a cast begun before the pull that would finish before it finishes on the
+    /// pull, as a player times a precast to land as the fight starts. False is the Go reference,
+    /// under which a hasted precast finishes early and its damage, landing before 0:00, is not
+    /// counted.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub prepull_casts_finish_on_pull: bool,
     /// MythicSim's healer sims under Forever's rules: each heal's share that real healers
     /// overheal, measured on foreverlogs.gg (`prepare::overheal`). Only the rest counts as
     /// healing; the share counts as overhealing. Empty is the Go reference, which counts every
