@@ -804,6 +804,8 @@ fn rogue_request(items: &[(usize, i64)]) -> Value {
 }
 
 fn prepare_forever(request: &Value) -> Value {
+    let mut request = request.clone();
+    crate::rogue_113483::forever_request(&mut request);
     forever_engine::prepare_json_with(
         request.to_string().as_bytes(),
         "rust",

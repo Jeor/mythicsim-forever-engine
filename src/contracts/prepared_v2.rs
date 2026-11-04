@@ -4838,10 +4838,33 @@ pub enum Effect {
         cost_per_stack: i32,
         class_spells: Vec<String>,
     },
-    /// Shank, Forever's rules only: an off hand strike that generates Energy.
+    /// Shank, Forever's rules only: an off hand strike that generates Energy, Flash of Steel's
+    /// share included. Boot Knife makes it add Combo Points with a chance.
     Shank {
         spell_id: i32,
         energy_gain: f64,
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        boot_knife_chance: f64,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        boot_knife_combo_points: i32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        boot_knife_action: Option<ActionId>,
+    },
+    /// Death Mark, Forever's rules only: a finisher that marks the target for the aura's
+    /// duration. The share of the damage the rogue deals to it, `stored_per_point` for each Combo
+    /// Point spent (twice that for the `doubled_class_spells`) and multiplied by
+    /// `coup_de_grace`, is stored, and released when the aura ends up to the cap of
+    /// `(cap_base + points * (cap_per_point + attack_power_per_point * attack power))`
+    /// times the crit factor and `coup_de_grace`.
+    DeathMark {
+        spell_id: i32,
+        aura: String,
+        stored_per_point: f64,
+        cap_base: f64,
+        cap_per_point: f64,
+        attack_power_per_point: f64,
+        coup_de_grace: f64,
+        doubled_class_spells: Vec<String>,
     },
     /// Poised, Forever's rules only (a Rogue, or a Druid starting in Cat Form): an aura the fight
     /// starts with, which the first Energy ability spends, taking `cost_reduction` Energy off its
@@ -4869,6 +4892,13 @@ pub enum Effect {
     GhostlyStrike {
         spell_id: i32,
         dodge_aura: String,
+        /// Forever's rules: the weapon damage is normalized (Hemorrhage's), not the weapon's own.
+        #[serde(default, skip_serializing_if = "is_false")]
+        normalized: bool,
+        /// Forever's rules: the aura that lets the next Ambush or Garrote out of Stealth, which a
+        /// hit puts up.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        ready_aura: String,
     },
     Hemorrhage {
         spell_id: i32,
@@ -4919,6 +4949,9 @@ pub enum Effect {
         tick_can_crit: bool,
         magic: bool,
         dirty_deeds: bool,
+        /// Forever's rules: Ghostly Strike's aura, which lets Garrote out of Stealth.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        ghostly_aura: String,
     },
     /// Go consumes.go Goblin Sapper Charge: a rolled Fire hit on the target and a second roll
     /// on the player, which rolls on the player's attack table against itself.
@@ -5619,6 +5652,7 @@ impl Effect {
             Effect::RogueProc { .. } => "rogue_proc",
             Effect::ThousandCuts { .. } => "thousand_cuts",
             Effect::Shank { .. } => "shank",
+            Effect::DeathMark { .. } => "death_mark",
             Effect::Poised { .. } => "poised",
             Effect::WoundPoison { .. } => "wound_poison",
             Effect::Venom { .. } => "venom",

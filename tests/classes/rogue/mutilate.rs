@@ -26,6 +26,8 @@ fn puncturing_wounds(rank: u32) -> String {
 }
 
 fn prepared(request: &Value) -> Value {
+    let mut request = request.clone();
+    crate::rogue_113483::forever_request(&mut request);
     prepare_json_with(request.to_string().as_bytes(), "rust", Rules::Forever).unwrap()
 }
 

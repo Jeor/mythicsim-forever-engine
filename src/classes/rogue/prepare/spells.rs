@@ -20,6 +20,7 @@ use crate::prepare::spelldata::Spell as Row;
 
 use super::armor;
 use super::masks;
+use super::rework::{self, POISED_SPELL_ID, SHANK_SPELL_ID};
 use super::spell_data::spell_data;
 use super::util::{
     aura_array_map, energy_cost, ignore_haste_cast, longest_cooldown, new_enemy_aura_array,
@@ -35,24 +36,14 @@ pub(super) const FINISHER: SpellFlag = SpellFlag::AGENT_RESERVED3;
 /// Go `RogueBleedTag`.
 const ROGUE_BLEED_TAG: &str = "RogueBleed";
 
-/// Shank's spell id. The client of 1.60.1.70707 has no row for Shank or Poised (the notes of
-/// 2 November 2026 add them), so these are provisional ids, beyond every id the client states
-/// (the highest is 1329183), until a client build carries the real ones. The rotation names
-/// Shank by this id.
-pub(crate) const SHANK_SPELL_ID: i32 = 1_399_001;
-/// Poised's spell id, provisional like [`SHANK_SPELL_ID`].
-pub(crate) const POISED_SPELL_ID: i32 = 1_399_002;
-
 /// Shank's Energy cost, and the Energy it generates at rank 2 (level 44; rank 1, level 24, is
-/// 15), which a level 60 rogue knows.
+/// 15), which a level 60 rogue knows; Flash of Steel adds to it.
 pub(crate) const SHANK_ENERGY_COST: i32 = 5;
 pub(crate) const SHANK_ENERGY_GAIN: f64 = 25.0;
 /// Shank's weapon damage share, its cooldown and its Global Cooldown.
 const SHANK_WEAPON_SHARE: f64 = 0.5;
 const SHANK_COOLDOWN: Duration = 10 * SECOND;
 const SHANK_GCD: Duration = SECOND;
-/// The Energy Poised takes off the next Energy ability.
-pub(crate) const POISED_COST_REDUCTION: i32 = 10;
 
 /// The fields the Rogue's main hand abilities share: the row's school and defense, a main hand
 /// special proc mask and the melee range.
@@ -236,6 +227,8 @@ impl Rogue {
         let rank = spell_data().garrote.highest();
         let tick = rank.periodic_effect();
         let tick_length = tick.period();
+        // Blood Splatter (Forever's rules) lengthens the bleed by whole ticks.
+        let splatter = self.blood_splatter_garrote(sim.rules);
         let spell = sim.get_or_register_spell(
             unit,
             SpellConfig {
@@ -251,7 +244,7 @@ impl Rogue {
                         tag: ROGUE_BLEED_TAG.to_string(),
                         ..AuraConfig::default()
                     },
-                    number_of_ticks: (rank.duration() / tick_length) as i32,
+                    number_of_ticks: ((rank.duration() + splatter) / tick_length) as i32,
                     tick_length,
                     ..DotConfig::default()
                 },
@@ -379,13 +372,16 @@ impl Rogue {
     /// Shank (notes of 2 November 2026, Forever's rules only): a baseline strike with the off hand
     /// weapon for 50% weapon damage that generates Energy. It needs an off hand weapon, so a
     /// rogue without one has no Shank. Level 24, 5 Energy, a 10 sec cooldown and melee range;
-    /// "cannot miss" reads as the off hand strike of Mutilate does (it can be blocked and crit,
-    /// but is never missed, dodged or parried), and the Global Cooldown and the off hand's
-    /// damage penalty are the other abilities'.
+    /// the row is Always Hit, so it can be blocked and crit but is never missed, dodged or
+    /// parried (as each hand of Mutilate), and the Global Cooldown and the off hand's damage
+    /// penalty are the other abilities'. A level 60 rogue knows rank 2 (1329549, 25 Energy); a
+    /// rotation that names rank 1 (1329283) or the provisional id #200 gave (1399001) presses
+    /// it. Flash of Steel adds Energy and takes time off the cooldown.
     pub(super) fn register_shank_spell(&mut self, sim: &mut Sim, unit: UnitId) {
         if sim.rules != Rules::Forever || sim.oh_weapon(unit).is_none() {
             return;
         }
+        let steel = self.extra_points("flash_of_steel");
         let timer = sim.new_timer(unit);
         let spell = sim.register_spell(
             unit,
@@ -405,7 +401,7 @@ impl Rogue {
                 cast: CastConfig {
                     cd: Cooldown {
                         timer: Some(timer),
-                        duration: SHANK_COOLDOWN,
+                        duration: SHANK_COOLDOWN - rework::flash_of_steel_cooldown(steel),
                     },
                     ..ignore_haste_cast(SHANK_GCD)
                 },
@@ -415,23 +411,28 @@ impl Rogue {
                 ..SpellConfig::default()
             },
         );
+        sim.spell_mut(spell).rank_aliases = vec![
+            spell_action(rework::SHANK_RANK_ONE_SPELL_ID),
+            spell_action(rework::SHANK_PROVISIONAL_SPELL_ID),
+        ];
         self.spells.shank = Some(spell);
     }
 
-    /// Poised (notes of 2 November 2026, Forever's rules only): out of combat at maximum Energy
-    /// the rogue gains Poised, which takes 10 Energy off the next Energy ability. Only the
-    /// opener sees it, so the fight activates it at its start and the first Energy ability
-    /// spends it.
+    /// Poised (1328825, level 18; Forever's rules only): out of combat at maximum Energy the
+    /// rogue gains the aura of 1328826, which takes 10 Energy off the next Energy ability, and
+    /// Composure adds 5 or 10 to that. Only the opener sees it, so the fight activates it at its
+    /// start and the first Energy ability spends it.
     pub(super) fn register_poised_aura(&mut self, sim: &mut Sim, unit: UnitId) {
         if sim.rules != Rules::Forever {
             return;
         }
+        let reduction = self.poised_cost_reduction();
         let cost_mod = sim.add_dynamic_mod(
             unit,
             SpellModConfig {
                 kind: SpellModType::PowerCostFlat,
                 class_mask: masks::ENERGY_ABILITIES,
-                int_value: -POISED_COST_REDUCTION,
+                int_value: -reduction,
                 ..SpellModConfig::default()
             },
         );
@@ -455,6 +456,29 @@ impl Rogue {
             },
         );
         self.auras.poised = Some(aura);
+    }
+
+    /// The Energy Poised takes off the next ability: 10, and Composure's 5 or 10 more.
+    pub(super) fn poised_cost_reduction(&self) -> i32 {
+        rework::POISED_COST_REDUCTION + rework::composure_bonus(self.extra_points("composure"))
+    }
+
+    /// Blood Splatter's extra duration on Garrote (Forever's rules), 0 without the talent.
+    pub(super) fn blood_splatter_garrote(&self, rules: Rules) -> Duration {
+        if rules == Rules::Forever && self.extra_points("blood_splatter") > 0 {
+            rework::BLOOD_SPLATTER_GARROTE
+        } else {
+            0
+        }
+    }
+
+    /// Blood Splatter's extra duration on Rupture (Forever's rules), 0 without the talent.
+    pub(super) fn blood_splatter_rupture(&self, rules: Rules) -> Duration {
+        if rules == Rules::Forever && self.extra_points("blood_splatter") > 0 {
+            rework::BLOOD_SPLATTER_RUPTURE
+        } else {
+            0
+        }
     }
 
     /// Go `registerVanishSpell`.

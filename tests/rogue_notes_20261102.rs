@@ -8,9 +8,9 @@ use forever_engine::{
 use serde_json::{json, Value};
 use std::{fs, path::Path};
 
-/// The provisional spell ids of Shank and Poised (`prepare::spells`), which no client row states.
-const SHANK: i64 = 1_399_001;
-const POISED: i64 = 1_399_002;
+/// Shank at level 44 and the aura Poised grants (`classes::rogue::prepare::rework`).
+const SHANK: i64 = 1_329_549;
+const POISED: i64 = 1_328_826;
 
 fn request(name: &str) -> Value {
     let path = Path::new(concat!(
@@ -30,7 +30,30 @@ fn with_talents(mut request: Value, talents: &str) -> Value {
     request
 }
 
+/// The production strings of the three specs, written for the old trees, as Forever's rules read
+/// them in the client's order since the rework of push 113483 (`tests/rogue_rework_20261104.rs`):
+/// the same points where the talent is still there, the freed ones on the nearest talent of the
+/// same tree that the tier rules allow.
+fn for_the_new_trees(talents: &str) -> &str {
+    match talents {
+        "005303105-32030320201515221-002" => "00530320201-3203032200012321531-002",
+        "0053031055110105-30230320201401" => "00530321251311031-3023032202012-",
+        "0053021-302301-5023203300013111051" => "005303001-320003-03523103132100115",
+        other => other,
+    }
+}
+
 fn prepared(request: &Value, rules: Rules) -> Value {
+    let mut request = request.clone();
+    if rules == Rules::Forever {
+        let talents = for_the_new_trees(
+            request["raid"]["parties"][0]["players"][0]["talentsString"]
+                .as_str()
+                .unwrap(),
+        )
+        .to_string();
+        player_mut(&mut request)["talentsString"] = Value::from(talents);
+    }
     prepare_json_with(request.to_string().as_bytes(), "rust", rules).unwrap()
 }
 
@@ -107,8 +130,10 @@ fn mutilate_deals_ninety_percent_weapon_damage() {
             .all(|hit| close(hit["damage_multiplier"].as_f64().unwrap(), share)));
         let mutilate = effects(prepared, "mutilate")[0];
         assert!(close(mutilate["weapon_share"].as_f64().unwrap(), share));
-        // The flat damage per hand is the client's, 67 at rank 4.
-        assert_eq!(mutilate["flat_damage"], 67.0);
+        // The flat damage per hand is the client's: 88 at the top rank under Forever's rules
+        // since the rework of push 113483, 67 before.
+        let flat = if share == 0.9 { 88.0 } else { 67.0 };
+        assert_eq!(mutilate["flat_damage"], flat);
     }
 }
 
@@ -195,32 +220,38 @@ fn flawless_execution_is_fifteen() {
 }
 
 /// Aggression: Sinister Strike and Eviscerate by 5/10/15% (was Sinister Strike, Eviscerate and
-/// Backstab by 2/4/6%). The fixture takes it at 2 points.
+/// Backstab by 2/4/6%).
 #[test]
 fn aggression_is_five_ten_fifteen_without_backstab() {
-    // Aggression is the sixteenth Combat talent; the rest of the tree stays as the production
-    // request has it.
-    let base = "005303105-32030320201515221-002";
-    let combat = |rank: u8| {
-        // The Combat tree is 17 talents; Aggression is the sixteenth.
-        let mut tree: Vec<char> = "32030320201515221".chars().collect();
+    // Coup de Grace 3 and Aggression, the other talents of the tree as the production request
+    // has them. Aggression is the sixteenth talent of the old Combat tree and the fourteenth of
+    // the new one.
+    let old = |rank: u8| {
+        let mut tree: Vec<char> = "30000000000000000".chars().collect();
         tree[15] = char::from_digit(u32::from(rank), 10).unwrap();
-        format!("005303105-{}-002", tree.iter().collect::<String>())
+        format!("-{}-", tree.iter().collect::<String>())
     };
-    assert_eq!(combat(2), base);
+    let new = |rank: u8| {
+        let mut tree: Vec<char> = "3000000000000".chars().collect();
+        tree.push(char::from_digit(u32::from(rank), 10).unwrap());
+        format!("-{}-", tree.iter().collect::<String>())
+    };
     let request = request("production-combat-rogue");
     for (rank, forever, reference) in [(1u8, 0.05, 0.02), (2, 0.10, 0.04), (3, 0.15, 0.06)] {
-        let request = with_talents(request.clone(), &combat(rank));
-        let f = prepared(&request, Rules::Forever);
-        let r = prepared(&request, Rules::GoReference);
-        // Improved Eviscerate (Coup de Grace) adds 20% to Eviscerate in both; Opportunity none.
+        let f = prepared(&with_talents(request.clone(), &new(rank)), Rules::Forever);
+        let r = prepared(
+            &with_talents(request.clone(), &old(rank)),
+            Rules::GoReference,
+        );
+        // Improved Eviscerate (Coup de Grace) adds 20% to Eviscerate in both.
         assert!(close(additive(&f, "sinister_strike"), 1.0 + forever));
         assert!(close(additive(&r, "sinister_strike"), 1.0 + reference));
         assert!(close(additive(&f, "eviscerate"), 1.2 + forever));
         assert!(close(additive(&r, "eviscerate"), 1.2 + reference));
-        // Backstab loses it under Forever's rules: only what else the tree gives remains.
+        // Backstab loses it under Forever's rules: nothing else raises it here.
         let backstab_f = additive(&f, "backstab");
         let backstab_r = additive(&r, "backstab");
+        assert!(close(backstab_f, 1.0), "rank {rank}");
         assert!(close(backstab_r - backstab_f, reference), "rank {rank}");
     }
 }
@@ -231,11 +262,8 @@ fn aggression_is_five_ten_fifteen_without_backstab() {
 fn coup_de_grace_is_seven_thirteen_twenty() {
     let request = request("production-combat-rogue");
     for (rank, bonus) in [('1', 0.07), ('2', 0.13), ('3', 0.20)] {
-        let mut tree: Vec<char> = "32030320201515221".chars().collect();
-        tree[0] = rank;
-        // Remove Aggression so only Coup de Grace is left on Eviscerate.
-        tree[15] = '0';
-        let talents = format!("005303105-{}-002", tree.iter().collect::<String>());
+        // Coup de Grace is the first talent of the Combat tree under both layouts.
+        let talents = format!("-{rank}-");
         let request = with_talents(request.clone(), &talents);
         for rules in [Rules::Forever, Rules::GoReference] {
             let prepared = prepared(&request, rules);
@@ -248,17 +276,17 @@ fn coup_de_grace_is_seven_thirteen_twenty() {
 }
 
 /// Efficient Strikes (Improved Sinister Strike) takes 3/5 Energy off Sinister Strike and
-/// Hemorrhage (Sinister Strike only before).
+/// Hemorrhage (Sinister Strike only before). It is the second talent of the Combat tree under
+/// both layouts.
 #[test]
 fn efficient_strikes_discounts_hemorrhage() {
     let request = request("production-subtlety-rogue");
     for (rank, discount) in [('1', -3), ('2', -5)] {
-        let request = with_talents(
-            request.clone(),
-            &format!("0053021-3{rank}2301-5023203300013111051"),
-        );
-        let forever = prepared(&request, Rules::Forever);
-        let reference = prepared(&request, Rules::GoReference);
+        // Hemorrhage is the sixteenth talent of the old Subtlety tree and of the new one.
+        let old = format!("-0{rank}-0000000000000001");
+        let new = format!("-0{rank}-0000000000000001");
+        let forever = prepared(&with_talents(request.clone(), &new), Rules::Forever);
+        let reference = prepared(&with_talents(request.clone(), &old), Rules::GoReference);
         assert_eq!(flat_modifier(&forever, "sinister_strike"), discount);
         assert_eq!(flat_modifier(&reference, "sinister_strike"), discount);
         assert_eq!(flat_modifier(&forever, "hemorrhage"), discount);
@@ -268,13 +296,14 @@ fn efficient_strikes_discounts_hemorrhage() {
 
 /// Shank is learned by every rogue holding an off hand weapon under Forever's rules: 5 Energy,
 /// a 10 sec cooldown, melee range, an off hand strike for 50% weapon damage that generates 25
-/// Energy at rank 2. The reference has no Shank.
+/// Energy at rank 2. The reference has no Shank. (The Combat reference build takes Flash of Steel
+/// at three ranks, 9 Energy and 1.2 sec: `tests/rogue_rework_20261104.rs` pins the talent.)
 #[test]
 fn shank_is_a_baseline_off_hand_strike() {
-    for name in [
-        "production-combat-rogue",
-        "production-assassination-rogue",
-        "production-subtlety-rogue",
+    for (name, cooldown_ns, energy) in [
+        ("production-combat-rogue", 8_800_000_000i64, 34.0),
+        ("production-assassination-rogue", 10_000_000_000, 25.0),
+        ("production-subtlety-rogue", 10_000_000_000, 25.0),
     ] {
         let request = request(name);
         let forever = prepared(&request, Rules::Forever);
@@ -282,10 +311,14 @@ fn shank_is_a_baseline_off_hand_strike() {
         assert_eq!(shank["action_id"]["spell_id"], SHANK, "{name}");
         assert_eq!(shank["cost"]["resource"], "energy");
         assert_eq!(shank["cost"]["base_cost"], 5);
-        assert_eq!(shank["cd"]["duration_ns"], 10_000_000_000i64);
+        assert_eq!(shank["cd"]["duration_ns"], cooldown_ns, "{name}");
         assert_eq!(shank["damage_multiplier"], 0.5);
         assert_eq!(shank["proc_mask"], json!(["ProcMaskMeleeOHSpecial"]));
-        assert_eq!(effects(&forever, "shank")[0]["energy_gain"], 25.0);
+        assert_eq!(
+            effects(&forever, "shank")[0]["energy_gain"],
+            energy,
+            "{name}"
+        );
         let reference = prepared(&request, Rules::GoReference);
         assert!(spells(&reference, "shank").is_empty(), "{name}");
         assert!(effects(&reference, "shank").is_empty(), "{name}");
@@ -436,8 +469,8 @@ fn poised_discounts_the_opener_once() {
         .all(|line| !line.contains("Cost = 40.000") || line.contains("{SpellID: 11290}")));
 }
 
-/// Shank in a rotation: it casts every 10 sec or so at the rotation's call, costs 5 Energy and
-/// gives 25.
+/// Shank in a rotation: it casts every 8.8 sec or so at the rotation's call (the Combat reference
+/// build has Flash of Steel at three ranks), costs 5 Energy and gives 34.
 #[test]
 fn shank_casts_and_generates_energy() {
     let request = with_shank(request("production-combat-rogue"), 60);
@@ -450,16 +483,16 @@ fn shank_casts_and_generates_energy() {
     assert!(casts
         .iter()
         .all(|line| line.contains("Cost = 5.000") || line.contains("Cost = 0.000")));
-    // The cooldown holds it to one cast in ten seconds.
+    // The cooldown holds it to one cast in 8.8 seconds.
     for pair in casts.windows(2) {
         assert!(
-            time_of(pair[1]) - time_of(pair[0]) >= 10.0 - 1e-9,
+            time_of(pair[1]) - time_of(pair[0]) >= 8.8 - 1e-9,
             "{pair:?}"
         );
     }
     let gains = log
         .lines()
-        .filter(|line| line.contains(&format!("Gained 25.000 energy from {{SpellID: {SHANK}}}")))
+        .filter(|line| line.contains(&format!("Gained 34.000 energy from {{SpellID: {SHANK}}}")))
         .count();
     assert!(gains >= 4, "{gains} Shank Energy gains");
     // It strikes with the off hand: the log names Shank's damage on the target.

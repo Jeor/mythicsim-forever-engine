@@ -420,19 +420,51 @@ the Go goldens and exporter uses. The departures:
   (blocked or critical, never missed, dodged or parried), is on the Global Cooldown and takes the
   off hand's damage penalty like the other off hand strikes. Poised is up at the start of every
   fight (out of combat at maximum Energy) and takes 10 Energy off the first Energy ability. The
-  client has no rows for Shank or Poised yet, so they have the provisional spell ids 1399001 and
-  1399002 (`prepare::spells`), which a rotation names Shank by, until a client build states the
-  real ones. Already the engine's: Improved Eviscerate, renamed Coup de Grace, is 7/13/20% in the
+  client now states both (see the rework bullet below), so Shank is 1329549 and Poised's aura is
+  1328826. Already the engine's: Improved Eviscerate, renamed Coup de Grace, is 7/13/20% in the
   client data, and Improved Sinister Strike is 3/5 Energy. Hemorrhage and Ghostly Strike "dealing
   much more damage than intended with a Dagger" is a server side fault the engine does not share:
   it reads the client's dagger effect (145% and 180%) in place of the plain share, never on top of
-  it, and the live store of 3 November still states those numbers. Not modelled: Death Mark
-  (Coup de Grace's 7/13/20% on it), which the engine has no spell for. Not taken yet, since they
-  depend on the new talent layout: the point counts of Lethality, Relentless Strikes, Seal Fate,
-  Dual Wield Specialization, Opportunity, Camouflage and Setup, the removed talents (Murder,
-  Quietus, Cutthroat, Thousand Cuts, Improved Distract), the new talents (Composure, Blood
-  Splatter, Flash of Steel, Boot Knife, Death Mark, Venom's Shank and Quick Getaway) and the row
-  moves. `tools/dev_notes_check.py` checks the rows of the Rogue part too.
+  it, and the live store of 3 November still states those numbers. Death Mark is in the next bullet. `tools/dev_notes_check.py` checks the rows of the Rogue part too.
+- The Rogue rework of hotfix pushes 113351 (Poised) and 113483 (the trees), client 1.60.1.70755
+  with hotfixes to push 113583 (wowsims/forever #840's store; Forever preparation, the reference
+  keeps the frozen data and `fill_talents`' proto order). The three trees are read in the client's
+  own order (`classes::rogue::prepare`, through `prepare::talent_layout`: Assassination 17
+  talents, Combat 19, Subtlety 18), so a string written for the old trees that does not fit (a
+  talent above its ranks, a tree too long) is refused under `talents` with the talent named, and
+  one that happens to fit is read in the new order. Murder, Quietus, Cutthroat, Thousand Cuts and
+  Improved Distract are gone; Blood Splatter, Composure, Flash of Steel, Boot Knife, Death Mark
+  and Quick Getaway are new, and so are read into the layout's extras, with Relentless Strikes'
+  five ranks (its proto field is a bool). Rank counts and values: Lethality 10/20%, Seal Fate
+  33/66/100%, Opportunity 4/8/12/16/20% (Backstab, Garrote, Ambush and Mutilate), Dual Wield
+  Specialization 25/50%, Relentless Strikes 4% a Combo Point a rank for 25 Energy, Camouflage
+  and Setup three ranks (nothing the engine reads). Shank is Shank rank 2 (1329549; rank 1 is
+  1329283, level 24, 15 Energy), 5 Energy, a 10 sec cooldown, 50% off hand weapon damage and 25
+  Energy; a rotation that names 1329283 or the provisional 1399001 of #200 presses it. Poised's
+  aura is 1328826 (the passive is 1328825). Composure adds 5 or 10 to Poised's 10 (15 or 20
+  off the opener). Flash of Steel adds 3 a rank to Shank's Energy and takes 0.4 sec a rank off
+  its cooldown (the row's effect says 2.5 sec at the top; the trait curve and the calculator say
+  2.0, which is used). Boot Knife gives a landed Shank a 20% a rank chance to add two Combo
+  Points (1329285; Shank's tooltip says one, its rows and the talent text say two). Venom is no
+  finisher: a Shank puts up 1310703 for 6 sec (30% poison damage, 20% poison chance). Blood
+  Splatter lengthens Rupture by 6 sec and Garrote by 9 sec, as three more ticks each (the
+  spell row and its Wowhead tooltip read 4 and 6; the trait curve, Wowhead's calculator and
+  upstream read 6 and 9, which is used). Mutilate's flat damage by rank is 44, 63 and 88 (33,
+  48 and 67 before) beside the 90% weapon share. Ghostly Strike's damage is normalized (the
+  row's new normalized weapon damage effect), and a Ghostly Strike puts up 1329326 for 7 sec,
+  which lets the next Ambush or Garrote out of Stealth (what Cutthroat gave Ambush). Death
+  Mark (rank 4 is 1325758; ranks 1 to 3 are 1316709, 1325756 and 1325757, which press it) is a
+  finisher for 25 Energy and a Combo Point or more, a 10 sec cooldown and 20 yd range, from
+  its rows; its tooltip, which Wowhead's Forever data carries since the morning of 4 November,
+  states the rest: 12% a Combo Point of the damage the rogue deals the target for 6 sec is
+  stored (twice that for Garrote and Rupture), then dealt up to a cap of (156 + 245 a point +
+  0.04 attack power a point) times (1 + melee crit chance), and Coup de Grace's 7/13/20%
+  multiplies both the share and the cap. Approximate: the tooltip does not say which damage
+  counts or how the release rolls, so every hit and tick of the rogue's other spells counts (the
+  damage after armor), a miss stores nothing, the release is a hit that cannot miss or crit and
+  takes no armor or multiplier again, and a mark still up when the fight ends releases nothing.
+  Not modelled: Quick Getaway, and the stat parts of Camouflage and Setup.
+  `tools/dev_notes_check.py` checks every row and curve above.
 - Riptide and the Druid's Poised, the last numbers of the same notes the client does not state yet
   (Forever preparation, the reference keeps the frozen rows; `prepare::hotfix_113554`). Riptide
   costs "about 40%" less mana (147, 180 and 231 for its three ranks, each 60% of the 245, 300 and

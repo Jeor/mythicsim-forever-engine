@@ -10,6 +10,8 @@ use std::{fs, path::Path};
 
 #[path = "support/paladin_113554.rs"]
 mod paladin_113554;
+#[path = "support/rogue_113483.rs"]
+mod rogue_113483;
 #[path = "support/warrior_trees_20261104.rs"]
 mod warrior_trees_20261104;
 
@@ -31,6 +33,8 @@ fn request(name: &str) -> Value {
     if !RECORDED_IN_113554.contains(&name) {
         paladin_113554::forever_request(&mut request);
     }
+    // A rogue's talents read in push 113483's trees.
+    rogue_113483::forever_request(&mut request);
     // The Warrior fixtures' talents are the old tree's, which Forever's rules read in the client's
     // order since the notes of 2 November (no test here prepares a Warrior under the reference).
     warrior_trees_20261104::forever_request(&mut request);

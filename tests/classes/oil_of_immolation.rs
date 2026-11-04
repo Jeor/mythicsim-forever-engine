@@ -33,7 +33,9 @@ fn request(targets: usize, edit: impl FnOnce(&mut Value)) -> Value {
 }
 
 fn prepare(request: &Value) -> Value {
-    prepare_json(&serde_json::to_vec(request).unwrap(), "oil-of-immolation").unwrap()
+    let mut request = request.clone();
+    crate::rogue_113483::forever_request(&mut request);
+    prepare_json(&serde_json::to_vec(&request).unwrap(), "oil-of-immolation").unwrap()
 }
 
 fn simulate(request: &Value) -> (Value, Value) {
