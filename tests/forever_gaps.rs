@@ -12,6 +12,8 @@ use std::{fs, path::Path};
 mod paladin_113554;
 #[path = "support/rogue_113483.rs"]
 mod rogue_113483;
+#[path = "support/shaman_layout.rs"]
+mod shaman_layout;
 #[path = "support/warrior_trees_20261104.rs"]
 mod warrior_trees_20261104;
 
@@ -55,6 +57,10 @@ fn prepared(name: &str, rules: Rules) -> Value {
     let mut request = request(name);
     if let (Rules::Forever, Some(talents)) = (rules, forever_talents(name)) {
         request["raid"]["parties"][0]["players"][0]["talentsString"] = Value::from(talents);
+    }
+    // A shaman's talents read in the launch client's order under Forever's rules.
+    if rules == Rules::Forever {
+        shaman_layout::forever_request(&mut request);
     }
     prepare_json_with(request.to_string().as_bytes(), "rust", rules).unwrap()
 }
@@ -869,6 +875,7 @@ fn a_swap_rebuilds_the_swarmguards_chances() {
         "enhancement-shaman-swap-swarmguard",
         &[(r#""duration":60"#, r#""duration":300"#)],
     );
+    shaman_layout::forever_request(&mut value);
     value = prepare_json_with(value.to_string().as_bytes(), "rust", Rules::Forever).unwrap();
     let index = value["effects"]
         .as_array()
