@@ -94,8 +94,11 @@ impl Vindication {
         fight.schedule_delayed_proc(trigger, spell, *result);
     }
 
-    pub(crate) fn on_delayed_proc(self, fight: &mut Fight<PaladinAgent>) {
-        fight.activate_aura(self.target_aura);
+    /// The handler: the debuff on the target the hit landed on (Go `targetAuras.Get(result.Target)`)
+    /// and the paladin's aura.
+    pub(crate) fn on_delayed_proc(self, fight: &mut Fight<PaladinAgent>, target: Side) {
+        let debuff = fight.aura_on(self.target_aura, target);
+        fight.activate_aura(debuff);
         if let Some(aura) = self.aura {
             fight.activate_aura(aura);
         }
@@ -147,6 +150,7 @@ pub(crate) fn sacred_arbiter_hit(
         return;
     }
     for &aura in judgements {
+        let aura = fight.aura_on(aura, result.target);
         if fight.aura(aura).active {
             fight.refresh_aura(aura);
         }

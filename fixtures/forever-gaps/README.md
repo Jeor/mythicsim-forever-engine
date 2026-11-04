@@ -81,3 +81,7 @@ checks the gate passes and runs it.
 | `dps-warrior-execute-phase-unset` | a Warrior's Recklessness on an execute phase check with no threshold, which builds no value (2 November 2026) |
 | `demonology-warlock-target-health-percent` | a Demonology Warlock reading its target's health percent, which builds no value since a target has no health bar (2 November 2026) |
 | `retribution-paladin-swap-without-crowd-pummeler` | a Retribution Paladin's own Manual Crowd Pummeler rotation run with the Pummeler taken off, whose execute phase and swing time checks preparation did not fold (4 November 2026; its talents are in push 113554's tree already) |
+| `protection-paladin-change-target-casts` | a Protection Paladin who changes target every 1.5 seconds and casts at each of three targets (3 November 2026; its talents are in push 113554's tree already) |
+| `ret-protection-paladin-change-target-casts-go-tree` | the five target Retribution and Protection Paladin tanking reference (validation/2026-10-07-tanking-several-targets-references) with that request's changes of target first, in the reference's tree, which Go's rules prepare |
+| `feral-bear-druid-change-target-faerie-fire` | a Feral Bear tanking five targets that changes target with Faerie Fire in its rotation (3 November 2026) |
+| `protection-warrior-dreadnaught-8p` | a Protection Warrior in Dreadnaught's Battlegear (8), whose Cheat Death goes up on a hit taken below a fifth of health (3 November 2026) |

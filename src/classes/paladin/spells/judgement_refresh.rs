@@ -44,6 +44,7 @@ impl JudgementRefresh {
             return;
         }
         for &aura in &self.judgements {
+            let aura = fight.aura_on(aura, result.target);
             if fight.aura(aura).active {
                 fight.refresh_aura(aura);
             }

@@ -1323,14 +1323,14 @@ impl Agent for PaladinAgent {
         })
     }
 
-    fn on_gain(fight: &mut Fight<Self>, _aura: AuraRef, kind: PaladinAura) {
+    fn on_gain(fight: &mut Fight<Self>, aura: AuraRef, kind: PaladinAura) {
         Self::protection_toggle(fight, kind, true);
         match kind {
             PaladinAura::Seal(seal) => seals::crusader_toggle(fight, seal, true),
             PaladinAura::HolyLightHasteAura(position) => {
                 fight.agent.holy_light_haste[position].toggle(fight, true)
             }
-            PaladinAura::CrusaderJudgement(member) => crusader::toggle(fight, member, true),
+            PaladinAura::CrusaderJudgement(member) => crusader::toggle(fight, aura, member, true),
             _ => {}
         }
         if kind == PaladinAura::DivineFavor {
@@ -1349,14 +1349,14 @@ impl Agent for PaladinAgent {
         }
     }
 
-    fn on_expire(fight: &mut Fight<Self>, _aura: AuraRef, kind: PaladinAura) {
+    fn on_expire(fight: &mut Fight<Self>, aura: AuraRef, kind: PaladinAura) {
         Self::protection_toggle(fight, kind, false);
         match kind {
             PaladinAura::Seal(seal) => seals::crusader_toggle(fight, seal, false),
             PaladinAura::HolyLightHasteAura(position) => {
                 fight.agent.holy_light_haste[position].toggle(fight, false)
             }
-            PaladinAura::CrusaderJudgement(member) => crusader::toggle(fight, member, false),
+            PaladinAura::CrusaderJudgement(member) => crusader::toggle(fight, aura, member, false),
             _ => {}
         }
         if kind == PaladinAura::DivineFavor {
@@ -1557,7 +1557,7 @@ impl Agent for PaladinAgent {
                 .agent
                 .vindication
                 .expect("Vindication is bound")
-                .on_delayed_proc(fight),
+                .on_delayed_proc(fight, result.target),
             PaladinAura::ReckoningBlock | PaladinAura::ReckoningCrit => {
                 Self::bound(&fight.agent.reckoning).add_charge(fight)
             }

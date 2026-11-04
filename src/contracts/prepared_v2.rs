@@ -4596,6 +4596,15 @@ pub enum Effect {
         rage: f64,
         metrics_action_id: ActionId,
     },
+    /// Warrior items.go Dreadnaught's Battlegear's 8 piece bonus (spell 28845): a landed hit
+    /// taken, not a proc, while the player's health is below the share puts up Cheat Death
+    /// (28846) a batch window later. Its healing taken bonus reaches only heals with a healing
+    /// coefficient, which the gate requires the player not to have.
+    CheatDeath {
+        trigger_aura: String,
+        aura: String,
+        health_fraction: f64,
+    },
     /// Sweeping Strikes: in Battle Stance, an aura with the row's charges, whose copies of
     /// hits need a second target and so never happen in scope.
     SweepingStrikes {
@@ -5641,6 +5650,7 @@ impl Effect {
             Effect::Retaliation { .. } => "retaliation",
             Effect::SweepingStrikes { .. } => "sweeping_strikes",
             Effect::BattlegearOfMightRage { .. } => "battlegear_of_might_rage",
+            Effect::CheatDeath { .. } => "cheat_death",
             Effect::RageOnAvoid { .. } => "rage_on_avoid",
             Effect::WarriorEnrage { .. } => "warrior_enrage",
             Effect::BloodCraze { .. } => "blood_craze",
