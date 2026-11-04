@@ -10,6 +10,10 @@ use forever_engine::{
 use serde_json::{json, Value};
 use std::{fs, path::Path};
 
+#[path = "support/warrior_trees_20261104.rs"]
+mod warrior_trees_20261104;
+use warrior_trees_20261104::forever_talents as forever_order;
+
 const RIPTIDE_RANKS: [(i64, i64, i64); 3] =
     [(408521, 147, 245), (1239242, 180, 300), (1239243, 231, 385)];
 const RIPTIDE: i64 = 1239243;
@@ -260,8 +264,9 @@ fn warrior_with(talents: &str) -> Value {
 }
 
 /// Community Warrior builds whose strings do not fit the proto's tree order panicked in the rank
-/// ladders ("rank 5 in a ladder of 2 ranks"); they are refused with the reason, under either
-/// rules. Of 509 benchmarked community builds, 35 give Fury 18 talents (the proto's tree has 17),
+/// ladders ("rank 5 in a ladder of 2 ranks"); they are refused with the reason. Of 509
+/// benchmarked community builds, 35 give Fury 18 talents (the proto's tree has 17, the reference
+/// refuses them; the client's Fury has 18 since the notes of 2 November, tests/warrior_trees_20261104.rs),
 /// and seven put more points in a talent than it has ranks.
 #[test]
 fn a_warrior_string_that_does_not_fit_is_refused_not_a_panic() {
@@ -270,24 +275,31 @@ fn a_warrior_string_that_does_not_fit_is_refused_not_a_panic() {
         "30305013-250500035150310051-",
         "20305013-250500035151310051-",
     ] {
-        for rules in [Rules::Forever, Rules::GoReference] {
-            let reason = refusal(&warrior_with(talents), rules);
-            assert!(
-                reason.contains("tree 2 has 17 talents, the string gives 18"),
-                "{reason}"
-            );
-            assert!(reason.contains(talents), "{reason}");
+        let reason = refusal(&warrior_with(talents), Rules::GoReference);
+        assert!(
+            reason.contains("tree 2 has 17 talents, the string gives 18"),
+            "{reason}"
+        );
+        assert!(reason.contains(talents), "{reason}");
+        // Forever's Fury has 18 talents: the length is not what refuses them.
+        if let Err(PrepareError::Refused(refusal)) = prepare_json_with(
+            warrior_with(talents).to_string().as_bytes(),
+            "rust",
+            Rules::Forever,
+        ) {
+            assert!(!refusal.reason.contains("tree 2 has 17 talents"));
         }
     }
     // Community build 370a0012: Improved Execute (two ranks) at 3, after Arms points that all fit
     // their ranks.
-    for rules in [Rules::Forever, Rules::GoReference] {
-        let reason = refusal(&warrior_with("203052030325041-05052003003201-"), rules);
-        assert!(
-            reason.contains("Improved Execute has 2 ranks, the string gives 3"),
-            "{reason}"
-        );
-    }
+    let reason = refusal(
+        &warrior_with("203052030325041-05052003003201-"),
+        Rules::GoReference,
+    );
+    assert!(
+        reason.contains("Improved Execute has 2 ranks, the string gives 3"),
+        "{reason}"
+    );
     // Five points where the tree has two ranks, in each tree.
     let reason = refusal(&warrior_with("-00000000005"), Rules::Forever);
     assert!(
@@ -311,7 +323,16 @@ fn a_warrior_string_that_does_not_fit_is_refused_not_a_panic() {
 #[test]
 fn a_warrior_string_within_its_ranks_still_prepares() {
     for rules in [Rules::Forever, Rules::GoReference] {
-        let value = prepared(&production("warrior"), rules);
+        let mut request = production("warrior");
+        if rules == Rules::Forever {
+            // The fixture's talents are the old tree's; Forever's rules read the client's order.
+            let old = player_mut(&mut request)["talentsString"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            player_mut(&mut request)["talentsString"] = json!(forever_order(&old));
+        }
+        let value = prepared(&request, rules);
         assert!(value["player"]["spells"].as_array().unwrap().len() > 10);
     }
 }

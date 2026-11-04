@@ -81,6 +81,11 @@ ROWS = [
     ("Mutilate rank 4 off hand weapon %", 1241590, 1240661, "BasePoints", 90, 75),
     ("Mutilate rank 1 weapon %", 1310705, 1340423, "BasePoints", 90, 75),
     ("Riptide rank 3 cooldown (ms)", 1239243, None, "CategoryCooldownMs", 12000, 6000),
+    ("Spearing Strike weapon damage %", 1310222, 1339573, "BasePoints", 75, 40),
+    ("Spearing Strike bonus against Giants and Dragonkin (times)", 1310222, 1339768, "BasePoints", 1, 2),
+    ("Bloodthirst rank 4 attack power share % (unchanged)", 23894, 1339740, "BasePoints", 45, 45),
+    ("Reckless Swings cooldown (ms)", 1329555, None, "CooldownMs", 15000, 0),
+    ("Reckless Swings charges' Rage (tenths)", 1329554, 1369166, "BasePoints", 50, 0),
 ]
 
 # (label, spell id, power cost field, Forever's value, frozen value): the mana cost a row states.
@@ -88,6 +93,7 @@ POWERS = [
     ("Riptide rank 1 mana (about 40% less)", 408521, "Cost", 147, 245),
     ("Riptide rank 2 mana (about 40% less)", 1239242, "Cost", 180, 300),
     ("Riptide rank 3 mana (about 40% less)", 1239243, "Cost", 231, 385),
+    ("Reckless Swings health cost (% of base health)", 1329555, "CostPct", 25, 0),
 ]
 
 # (label, spell id, Forever's value, frozen value): the stacks an aura row states.
@@ -112,9 +118,21 @@ TALENTS = [
     ("Flurry (Shaman)", 16256, 0, [6, 12, 18, 24, 30], [5, 10, 15, 20, 25]),
     ("Aggression", 18427, 0, [5, 10, 15], [2, 4, 6]),
     ("Rend and Tear", 1223246, 0, [3, 6, 9, 12, 15], [2, 4, 6, 8, 10]),
+    ("Flurry (Warrior)", 12319, 0, [10, 20, 30], [5, 10, 15, 20, 25]),
+    ("Improved Tactical Mastery", 12295, 0, [5, 10, 15], [3, 6, 9, 12, 15]),
+    ("Bloodthrill", 1289682, 0, [10, 20], [4, 8, 12, 16, 20]),
+    ("Improved Whirlwind cooldown (ms)", 1310315, 0, [-1000, -2000], []),
+    ("Improved Whirlwind closest enemy damage", 1310315, 1, [15, 30], []),
+    ("Furious Precision (unchanged)", 1323963, 0, [4, 7, 10], [4, 7, 10]),
 ]
 
 NOT_IN_DATA = [
+    ("Defensive Stance threat 80% and Defiance 7/13/20% (Warrior)",
+     "no row yet: the 4 November store still states 30 (effect 686475) and 5/10/15, and Wowhead's "
+     "tooltips read 30% and 15%; Forever's rules keep the notes' values until a row or a blue post "
+     "says otherwise"),
+    ("Gore Drinker and Lingering Rage (Warrior)",
+     "healing and the Rage decay out of combat, which the sim does not model"),
     ("Riptide has no initial heal, only the heal over time",
      "the tooltip names a heal and a heal over time; the first effect leaves the row as a heal"),
     ("Poised for Druids (level 32, 10 Energy off the next Energy ability out of combat)",

@@ -220,6 +220,8 @@ fn the_oil_leaves_the_potion_alone() {
         if oil {
             consumables["oilOfImmolation"] = json!(true);
         }
+        // The fixture's talents are the old tree's; Forever's rules read the client's order.
+        crate::warrior_trees_20261104::forever_request(&mut request);
         request
     };
     let casts = |result: &Value| -> f64 {
