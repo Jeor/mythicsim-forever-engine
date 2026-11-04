@@ -10,10 +10,10 @@ use std::{fs, path::Path};
 mod paladin_113554;
 #[path = "support/rogue_113483.rs"]
 mod rogue_113483;
-#[path = "support/warrior_trees_20261104.rs"]
-mod warrior_trees_20261104;
 #[path = "support/shaman_layout.rs"]
 mod shaman_layout;
+#[path = "support/warrior_trees_20261104.rs"]
+mod warrior_trees_20261104;
 
 #[derive(Deserialize)]
 struct Manifest {

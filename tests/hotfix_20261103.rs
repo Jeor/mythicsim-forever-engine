@@ -6,10 +6,10 @@ use forever_engine::{prepare_json_with, Rules};
 use serde_json::Value;
 use std::{fs, path::Path};
 
-#[path = "support/warrior_trees_20261104.rs"]
-mod warrior_trees_20261104;
 #[path = "support/shaman_layout.rs"]
 mod shaman_layout;
+#[path = "support/warrior_trees_20261104.rs"]
+mod warrior_trees_20261104;
 
 fn request(name: &str) -> Value {
     let path = Path::new(concat!(
