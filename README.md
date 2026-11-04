@@ -889,6 +889,16 @@ the Go goldens and exporter uses. The departures:
   totem is cast (air slot, mana, global cooldown) and its trigger stays off while the party's
   totem stands or the imbue is up; an item swap that takes the imbue off lets it back on at
   once. The reference refuses the request, as before (`one_aura` on `windfury_totem_self`).
+- Soul Siphon counts the Affliction effects active at each tick. Its client 1.60.1.70755 text:
+  Drain Life, Drain Soul and Wrack deal "12% per each of your other Affliction effects active on
+  the target, up to a maximum increase of 36%". The talent is a dummy aura, so the server counts,
+  and Forever's damage over time reads the caster's modifiers at each tick, so each Drain Life and
+  Wrack tick counts what is up then: the warlock's Bane of Agony or Bane of Doom, Corruption,
+  Siphon Life and its own Curse of the Elements or Curse of Recklessness (skill line 355), at most
+  three. The raid's curse is another caster's and does not count. The reference counts every
+  registered Affliction aura on the target, active or not (Go `AfflictionCount`), which is the
+  full 36% on every tick (`soul_siphon_live` on `drain_life` and `wrack`,
+  `tests/forever_soul_siphon_20261104.rs`).
 
 ## Repository layout
 

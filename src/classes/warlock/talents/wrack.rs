@@ -7,7 +7,7 @@ use crate::core::fight::{Agent, DotId, Fight, SpellDamageTakenModifier};
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Wrack {
     pub(crate) dot: DotId,
-    soul_siphon: f64,
+    pub(crate) soul_siphon: f64,
 }
 
 /// Resolve the channel's dot and register the bonus on the target, after Improved Shadow
@@ -35,11 +35,12 @@ pub(crate) fn bind<A: Agent>(
 }
 
 impl Wrack {
-    /// `OnTick` of a target's dot: the snapshot damage, Soul Siphon, then the tick dealt.
-    pub(crate) fn tick<A: Agent>(&self, fight: &mut Fight<A>, dot: DotId) {
+    /// `OnTick` of a target's dot: the snapshot damage, Soul Siphon's `soul_siphon`, then the
+    /// tick dealt.
+    pub(crate) fn tick<A: Agent>(&self, fight: &mut Fight<A>, dot: DotId, soul_siphon: f64) {
         let mut result = fight.snapshot_dot_tick_calc(dot);
         let spell = fight.dots[dot].spell;
-        fight.scale_damage(spell, &mut result, self.soul_siphon);
+        fight.scale_damage(spell, &mut result, soul_siphon);
         fight.deal_damage(spell, result, true);
     }
 }

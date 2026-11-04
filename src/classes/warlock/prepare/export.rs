@@ -13,7 +13,9 @@ use crate::prepare::aura_helpers::ProcTrigger;
 use crate::prepare::character::constants::CHARACTER_LEVEL;
 use crate::prepare::dbcenums;
 use crate::prepare::env::Environment;
-use crate::prepare::sim::{AuraId, Duration, Sim, SpellId, UnitId, MILLISECOND, NEVER_EXPIRES};
+use crate::prepare::sim::{
+    AuraId, Duration, Rules, Sim, SpellId, UnitId, MILLISECOND, NEVER_EXPIRES,
+};
 use crate::prepare::spell::{school, DefenseType};
 use crate::prepare::spelldata::{Ladder, Spell as Row};
 use crate::prepare::stats::{SchoolIndex, Stat};
@@ -217,6 +219,26 @@ impl Warlock {
                 .mul_add(Warlock::affliction_count(sim, target).min(3.0), 1.0);
         }
         drain.insert("soul_siphon".into(), json!(soul_siphon));
+        // Forever's rules: the effects active at each tick count (talents/soul_siphon.rs), the
+        // warlock's Affliction dots and its own curse, rather than every registered aura.
+        let soul_siphon_live = (sim.rules == Rules::Forever && soul_siphon_points > 0).then(|| {
+            let mut dot_spells = vec![
+                data.bane_of_agony.highest().id,
+                data.bane_of_doom.highest().id,
+                data.corruption.highest_for(env.rules).id,
+            ];
+            if talents.bool("siphon_life") {
+                dot_spells.push(data.siphon_life.highest().id);
+            }
+            json!({
+                "per_effect": data.soul_siphon.fraction_at(soul_siphon_points),
+                "max_effects": 3,
+                "dot_spells": dot_spells,
+            })
+        });
+        if let Some(live) = &soul_siphon_live {
+            drain.insert("soul_siphon_live".into(), live.clone());
+        }
         drain.insert(
             "self_healing_multiplier".into(),
             json!(sim.unit(unit).pseudo_stats.self_healing_multiplier),
@@ -227,6 +249,9 @@ impl Warlock {
             let row = crate::prepare::hotfix_113554::row(sim.rules, data.wrack.highest().id);
             let mut wrack = warlock_tick(row, unrepresented);
             wrack.insert("soul_siphon".into(), json!(soul_siphon));
+            if let Some(live) = &soul_siphon_live {
+                wrack.insert("soul_siphon_live".into(), live.clone());
+            }
             wrack.insert("dot_bonus".into(), json!(1.0 + row.effect_n(2).percent()));
             wrack.insert(
                 "dot_spells".into(),

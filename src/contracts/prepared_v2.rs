@@ -462,6 +462,17 @@ pub struct SealOfFuryRank {
     pub shield_share: f64,
 }
 
+/// Soul Siphon under Forever's rules: `per_effect` more Drain Life and Wrack damage per each of
+/// the warlock's other Affliction effects active on the target at the tick, up to
+/// `max_effects`. The effects are the dots of `dot_spells` and the warlock's own curse.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SoulSiphonLive {
+    pub per_effect: f64,
+    pub max_effects: u32,
+    pub dot_spells: Vec<i32>,
+}
+
 /// Improved Seal of Fury: the mana a spent shield returns, raised per level the target is
 /// above the paladin up to a cap, and its metrics.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -3658,6 +3669,10 @@ pub enum Effect {
         tick_can_crit: bool,
         soul_siphon: f64,
         self_healing_multiplier: f64,
+        /// Forever's rules: Soul Siphon counts the effects active at each tick, and
+        /// `soul_siphon` is unused.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        soul_siphon_live: Option<SoulSiphonLive>,
     },
     /// Wrack: a channel scaled by Soul Siphon, and while it runs a bonus on the ticks of
     /// `dot_spells`.
@@ -3668,6 +3683,9 @@ pub enum Effect {
         soul_siphon: f64,
         dot_bonus: f64,
         dot_spells: Vec<usize>,
+        /// Forever's rules: as Drain Life's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        soul_siphon_live: Option<SoulSiphonLive>,
     },
     /// Rain of Fire: the channel is an area dot on the warlock whose every tick casts the
     /// triggered tick spell, a fixed amount rolled to hit and to crit on each target. The cast
