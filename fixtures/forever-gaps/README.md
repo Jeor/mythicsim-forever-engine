@@ -80,3 +80,4 @@ checks the gate passes and runs it.
 | `feral-druid-swap-shadowcraft-armor` | a Feral Druid in Shadowcraft Armor (5) swapping weapons, whose energize rolls a procs-per-minute manager the swap rebuilds (2 November 2026) |
 | `dps-warrior-execute-phase-unset` | a Warrior's Recklessness on an execute phase check with no threshold, which builds no value (2 November 2026) |
 | `demonology-warlock-target-health-percent` | a Demonology Warlock reading its target's health percent, which builds no value since a target has no health bar (2 November 2026) |
+| `retribution-paladin-swap-without-crowd-pummeler` | a Retribution Paladin's own Manual Crowd Pummeler rotation run with the Pummeler taken off, whose execute phase and swing time checks preparation did not fold (4 November 2026; its talents are in push 113554's tree already) |
