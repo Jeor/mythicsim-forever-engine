@@ -21,6 +21,7 @@ mod warrior_trees_20261104;
 const RECORDED_IN_113554: &[&str] = &[
     "retribution-paladin-swap-dark-iron-sunderer",
     "protection-paladin-quel-serrar",
+    "retribution-paladin-swap-without-crowd-pummeler",
 ];
 
 fn request(name: &str) -> Value {
@@ -1180,4 +1181,32 @@ fn a_targets_health_percent_drops_out() {
         )],
     ));
     assert_eq!(player["dps"], without["dps"]);
+}
+
+/// A Retribution Paladin's own rotation built around the Manual Crowd Pummeler (9449), run with
+/// the Pummeler taken off (production sims 3106cb7e and fb6fb3a0, 4 November 2026). The Haste
+/// aura (13494) is then unknown, so an action that needs it up folds to false and Go prunes it.
+/// One action asks for it or an execute phase with a swing time check, and preparation could not
+/// tell whether that `or` folds to false, so it refused the rotation. Go builds the swing values
+/// and the execute phase check whatever the gear: the `or` reads as the check.
+#[test]
+fn a_rotation_for_a_removed_crowd_pummeler_prepares() {
+    let name = "retribution-paladin-swap-without-crowd-pummeler";
+    let (_, player) = run(name);
+    assert!(action(&player, 20920, 0).0 > 0.0, "Seal of Command casts");
+    // The Go reference, on the Go tree, equals the Go engine at the pin to the last digit.
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("fixtures/forever-gaps/{name}.request.json"));
+    let recorded = String::from_utf8(fs::read(path).unwrap()).unwrap();
+    let go_tree = recorded.replace(
+        r#""talentsString":"050050002-503-05233301001301351""#,
+        r#""talentsString":"52003-503-05225231001330321""#,
+    );
+    assert_ne!(recorded, go_tree);
+    let reference = prepare_json_with(go_tree.as_bytes(), "rust", Rules::GoReference).unwrap();
+    let reference: PreparedV2 = serde_json::from_value(reference).unwrap();
+    check_prepared(&reference).unwrap();
+    let result = simulate_prepared(&reference).unwrap().result;
+    let player = &result["raidMetrics"]["parties"][0]["players"][0];
+    assert_eq!(player["dps"]["avg"].as_f64(), Some(735.1341492796465));
 }
