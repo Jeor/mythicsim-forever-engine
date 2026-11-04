@@ -6,4 +6,5 @@ pub(crate) mod demonic_brand;
 pub(crate) mod improved_shadow_bolt;
 pub(crate) mod nightfall;
 pub(crate) mod shadow_and_flame;
+pub(crate) mod soul_siphon;
 pub(crate) mod wrack;

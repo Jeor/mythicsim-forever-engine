@@ -37,6 +37,7 @@ use super::{
         improved_shadow_bolt::{self, ImprovedShadowBolt},
         nightfall::{self, Nightfall},
         shadow_and_flame::{self, ShadowAndFlame},
+        soul_siphon::{self, SoulSiphon},
         wrack::{self, Wrack},
     },
 };
@@ -123,6 +124,8 @@ pub(crate) struct WarlockAgent {
     bane_of_doom_dot: Option<DotId>,
     drain_life: Option<DrainLife>,
     wrack: Option<Wrack>,
+    /// Soul Siphon read at each tick of Drain Life and Wrack, under Forever's rules.
+    soul_siphon: Option<SoulSiphon>,
     pub(crate) hellfire: Option<Hellfire>,
     rain_of_fire: Option<RainOfFire>,
     /// Death Coil's base, its healing spell and the warlock's healing modifiers.
@@ -344,6 +347,7 @@ impl WarlockAgent {
                     tick_can_crit,
                     soul_siphon,
                     self_healing_multiplier,
+                    soul_siphon_live,
                 } => {
                     let dot = bind_snapshot_dot(&mut fight, *spell_id, *tick_base, *tick_can_crit)?;
                     let metrics = fight.spells[find_spell(&fight, *spell_id)?]
@@ -355,6 +359,9 @@ impl WarlockAgent {
                         *self_healing_multiplier,
                         metrics,
                     ));
+                    if let Some(live) = soul_siphon_live {
+                        fight.agent.soul_siphon = Some(soul_siphon::bind(&fight, live)?);
+                    }
                 }
                 Effect::Wrack {
                     spell_id,
@@ -363,10 +370,14 @@ impl WarlockAgent {
                     soul_siphon,
                     dot_bonus,
                     dot_spells,
+                    soul_siphon_live,
                 } => {
                     let dot = bind_snapshot_dot(&mut fight, *spell_id, *tick_base, *tick_can_crit)?;
                     let bound = wrack::bind(&mut fight, dot, *soul_siphon, dot_spells, *dot_bonus);
                     fight.agent.wrack = Some(bound);
+                    if let Some(live) = soul_siphon_live {
+                        fight.agent.soul_siphon = Some(soul_siphon::bind(&fight, live)?);
+                    }
                 }
                 Effect::Hellfire {
                     spell_id,
@@ -698,6 +709,27 @@ impl WarlockAgent {
     }
 }
 
+impl WarlockAgent {
+    /// The warlock's own Curse of the Elements on the first target, when it can cast one.
+    pub(crate) fn curse_of_the_elements_aura(&self) -> Option<AuraRef> {
+        self.curse_of_the_elements.as_ref().map(|curse| curse.aura)
+    }
+
+    /// The warlock's own Curse of Recklessness on the first target, when it can cast one.
+    pub(crate) fn curse_of_recklessness_aura(&self) -> Option<AuraRef> {
+        self.curse_of_recklessness.map(|curse| curse.aura)
+    }
+}
+
+/// Soul Siphon's multiplier on a tick of `dot`: counted now under Forever's rules, the
+/// prepared constant otherwise.
+fn soul_siphon_now(fight: &Fight<WarlockAgent>, dot: DotId, prepared: f64) -> f64 {
+    match &fight.agent.soul_siphon {
+        Some(soul_siphon) => soul_siphon.multiplier(fight, fight.dots[dot].side),
+        None => prepared,
+    }
+}
+
 impl Agent for WarlockAgent {
     type Spell = WarlockSpell;
     type Aura = WarlockAura;
@@ -923,11 +955,13 @@ impl Agent for WarlockAgent {
             }
             WarlockSpell::DrainLife => {
                 let drain = fight.agent.drain_life.expect("Drain Life is bound");
-                drain.tick(fight, dot);
+                let soul_siphon = soul_siphon_now(fight, dot, drain.soul_siphon);
+                drain.tick(fight, dot, soul_siphon);
             }
             WarlockSpell::Wrack => {
                 let wrack = fight.agent.wrack.expect("Wrack is bound");
-                wrack.tick(fight, dot);
+                let soul_siphon = soul_siphon_now(fight, dot, wrack.soul_siphon);
+                wrack.tick(fight, dot, soul_siphon);
             }
             WarlockSpell::Hellfire => hellfire::tick(fight, dot),
             WarlockSpell::RainOfFire => {
