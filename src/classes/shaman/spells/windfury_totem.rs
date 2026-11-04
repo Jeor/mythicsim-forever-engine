@@ -3,6 +3,13 @@
 //! the dummy's exclusive effect turns the trigger on, which grants charges of attack power and
 //! an extra main hand attack, and landed autos spend the charges. Both rows ask for a hit that
 //! lands and deals damage.
+//!
+//! Under Forever's rules (`one_aura`) the party's Windfury Totem and the shaman's own both give
+//! aura 10612, which does not stack (no cumulative aura, no stacking for different casters), and
+//! a main hand Windfury Weapon "disables any benefit you personally receive from Windfury Totem"
+//! (every rank's tooltip). So the own totem's trigger stays off while the party's totem stands
+//! beside it or a main hand Windfury Weapon is up; the cast still takes the air slot, its mana
+//! and its global cooldown.
 
 use crate::{
     contracts::prepared_v2::Effect,
@@ -26,6 +33,7 @@ pub(crate) struct WindfuryTotem {
     pub(crate) duration: i64,
     gain_log: String,
     expire_log: String,
+    one_aura: bool,
 }
 
 /// Spellbook positions as a mask.
@@ -55,6 +63,7 @@ pub(crate) fn bind<A: Agent>(fight: &Fight<A>, effect: &Effect) -> Result<Windfu
         white_spells,
         proc_gain_log,
         proc_expire_log,
+        one_aura,
         ..
     } = effect
     else {
@@ -86,6 +95,7 @@ pub(crate) fn bind<A: Agent>(fight: &Fight<A>, effect: &Effect) -> Result<Windfu
         duration: *duration_ns,
         gain_log: proc_gain_log.clone(),
         expire_log: proc_expire_log.clone(),
+        one_aura: *one_aura,
     })
 }
 
@@ -103,9 +113,36 @@ impl WindfuryTotem {
         fight.deactivate_aura(self.tracking);
     }
 
-    /// The dummy aura's exclusive effect turns the trigger on as it activates.
-    pub(crate) fn on_dummy_gain<A: Agent>(&self, fight: &mut Fight<A>) {
+    /// Under Forever's rules, whether another source holds the aura's benefit: the party's
+    /// totem, or a main hand Windfury Weapon that blocks the totem (`imbue_blocks`).
+    fn yields<A: Agent>(&self, fight: &Fight<A>, imbue_blocks: bool) -> bool {
+        self.one_aura && (fight.windfury.is_some() || imbue_blocks)
+    }
+
+    /// The dummy aura's exclusive effect turns the trigger on as it activates, unless the
+    /// benefit is another source's.
+    pub(crate) fn on_dummy_gain<A: Agent>(&self, fight: &mut Fight<A>, imbue_blocks: bool) {
+        if self.yields(fight, imbue_blocks) {
+            return;
+        }
         fight.activate_aura(self.trigger);
+    }
+
+    /// Under Forever's rules a main hand Windfury Weapon going up turns the trigger off, and
+    /// going down (an item swap) lets a standing totem turn it back on, as its next refresh of
+    /// the dummy aura would.
+    pub(crate) fn on_imbue_change<A: Agent>(&self, fight: &mut Fight<A>, imbue_blocks: bool) {
+        if !self.one_aura {
+            return;
+        }
+        let active = fight.aura(self.trigger).active;
+        if self.yields(fight, imbue_blocks) {
+            if active {
+                fight.deactivate_aura(self.trigger);
+            }
+        } else if !active && fight.aura(self.dummy).active {
+            fight.activate_aura(self.trigger);
+        }
     }
 
     /// The dummy aura's exclusive effect turns the trigger off as it fades.

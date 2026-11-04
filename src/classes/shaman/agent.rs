@@ -135,6 +135,12 @@ pub(crate) struct ShamanAgent {
     flame_shock_dot: Option<SpellId>,
     lava_burst_bonus: f64,
     fire_nova_damage: f64,
+    /// Fire Nova's radius around the active fire totem; zero reaches every target.
+    fire_nova_radius: f64,
+    /// Where the fire totem standing now was dropped: the shaman's distance from the targets
+    /// at the cast. The fight models one distance between the player and the targets, so a
+    /// totem reaches all of them or none.
+    fire_totem_distance: f64,
     searing_totem: Option<SearingTotem>,
     elemental_focus: Option<ElementalFocus>,
     focus_trigger: elemental_focus::Trigger,
@@ -165,6 +171,8 @@ pub(crate) struct ShamanAgent {
     frostbrand_chances: Vec<Option<f64>>,
     /// Magma Totem's pulse base and lifetime.
     magma: Option<(f64, i64)>,
+    /// Magma Totem's pulse radius around the totem; zero reaches every target.
+    magma_radius: f64,
     /// Lightning Shield's aura and charges.
     lightning_shield: Option<(AuraRef, i32)>,
     water_shield: Option<WaterShield>,
@@ -686,13 +694,21 @@ impl ShamanAgent {
                 Effect::LavaBurst {
                     flame_shock_bonus, ..
                 } => fight.agent.lava_burst_bonus = *flame_shock_bonus,
-                Effect::FireNova { base_damage, .. } => fight.agent.fire_nova_damage = *base_damage,
+                Effect::FireNova {
+                    base_damage,
+                    radius_yards,
+                    ..
+                } => {
+                    fight.agent.fire_nova_damage = *base_damage;
+                    fight.agent.fire_nova_radius = *radius_yards;
+                }
                 Effect::SearingTotem {
                     attack_spell_id,
                     attack_damage,
                     magma_totem_aura,
                     flametongue_totem_aura,
                     duration_ns,
+                    attack_range_yards,
                     ..
                 } => {
                     fight.agent.searing_duration = *duration_ns;
@@ -704,6 +720,7 @@ impl ShamanAgent {
                             attack_damage: *attack_damage,
                             magma_totem,
                             flametongue_totem,
+                            attack_range: *attack_range_yards,
                         });
                     }
                 }
@@ -840,8 +857,12 @@ impl ShamanAgent {
                 Effect::MagmaTotem {
                     pulse_damage,
                     duration_ns,
+                    radius_yards,
                     ..
-                } => fight.agent.magma = Some((*pulse_damage, *duration_ns)),
+                } => {
+                    fight.agent.magma = Some((*pulse_damage, *duration_ns));
+                    fight.agent.magma_radius = *radius_yards;
+                }
                 Effect::LightningShield { aura, charges, .. } => {
                     fight.agent.lightning_shield = Some((fight.player_aura(aura)?, *charges));
                 }
@@ -1094,6 +1115,17 @@ impl ShamanAgent {
         Ok(())
     }
 
+    /// A fire totem stands where the shaman drops it, at the shaman's distance from the targets.
+    fn drop_fire_totem(fight: &mut Fight<Self>) {
+        fight.agent.fire_totem_distance = fight.distance_now(Side::Player);
+    }
+
+    /// Whether the fire totem standing now reaches the targets with `radius` yards (Forever's
+    /// rules); zero, as the reference exports it, reaches them from anywhere.
+    fn fire_totem_reaches(fight: &Fight<Self>, radius: f64) -> bool {
+        radius == 0.0 || fight.agent.fire_totem_distance <= radius
+    }
+
     /// Go `cancelFireTotems`: Magma Totem's dot, Searing Totem's dot, then Flametongue Totem's
     /// aura. Totem of Wrath is never set.
     fn cancel_fire_totems(fight: &mut Fight<Self>) {
@@ -1140,6 +1172,23 @@ impl ShamanAgent {
             .searing_totem
             .clone()
             .expect("Searing Totem is bound")
+    }
+
+    /// Whether a main hand Windfury Weapon is up and blocks a Windfury Totem's benefit.
+    fn windfury_imbue_blocks_totem(fight: &Fight<Self>) -> bool {
+        fight
+            .agent
+            .windfury_weapon
+            .as_ref()
+            .is_some_and(|imbue| imbue.blocks_windfury_totem && fight.aura(imbue.trigger).active)
+    }
+
+    /// The own Windfury Totem follows the imbue going up or down.
+    fn windfury_imbue_changed(fight: &mut Fight<Self>) {
+        if let Some(totem) = fight.agent.windfury_totem.clone() {
+            let imbue_blocks = Self::windfury_imbue_blocks_totem(fight);
+            totem.on_imbue_change(fight, imbue_blocks);
+        }
     }
 
     fn windfury_totem(fight: &Fight<Self>) -> WindfuryTotem {
@@ -1248,11 +1297,14 @@ impl Agent for ShamanAgent {
             }
             ShamanSpell::FireNova => {
                 let base = fight.agent.fire_nova_damage;
-                fire_nova::apply(fight, spell, base);
+                if Self::fire_totem_reaches(fight, fight.agent.fire_nova_radius) {
+                    fire_nova::apply(fight, spell, base);
+                }
             }
             ShamanSpell::SearingTotem => {
                 let state = Self::searing_totem(fight);
                 searing_totem::apply(fight, spell, &state);
+                Self::drop_fire_totem(fight);
                 let expires = fight.now + fight.agent.searing_duration;
                 fight.agent.totems.set(Totem::Fire, expires);
             }
@@ -1261,6 +1313,7 @@ impl Agent for ShamanAgent {
             }
             ShamanSpell::MagmaTotem => {
                 Self::cancel_fire_totems(fight);
+                Self::drop_fire_totem(fight);
                 let dot = fight.spells[spell].dot.expect("Magma Totem has a dot");
                 fight.apply_dot(dot);
                 let (_, duration) = fight.agent.magma.expect("Magma Totem is bound");
@@ -1274,6 +1327,7 @@ impl Agent for ShamanAgent {
                     .flametongue_totem
                     .clone()
                     .expect("Flametongue Totem is bound");
+                Self::drop_fire_totem(fight);
                 let expires = fight.now + state.duration;
                 fight.agent.totems.set(Totem::Fire, expires);
                 fight.activate_aura(state.aura);
@@ -1657,13 +1711,17 @@ impl Agent for ShamanAgent {
             // Go CalcPeriodicAoeDamage and DealBatchedPeriodicDamage.
             ShamanSpell::MagmaTotem => {
                 let (base, _) = fight.agent.magma.expect("Magma Totem is bound");
-                magma_totem::tick(fight, dot, base);
+                if Self::fire_totem_reaches(fight, fight.agent.magma_radius) {
+                    magma_totem::tick(fight, dot, base);
+                }
             }
             ShamanSpell::FlameShockDot => fight.snapshot_dot_tick(dot),
             ShamanSpell::SearingTotem => {
                 let state = Self::searing_totem(fight);
                 let side = fight.dots[dot].side;
-                searing_totem::tick(fight, side, &state);
+                if Self::fire_totem_reaches(fight, state.attack_range) {
+                    searing_totem::tick(fight, side, &state);
+                }
             }
             _ => {}
         }
@@ -1691,7 +1749,8 @@ impl Agent for ShamanAgent {
 
     fn on_exclusive_gain(fight: &mut Fight<Self>, _aura: AuraRef, kind: ShamanAura) {
         if kind == ShamanAura::WindfuryTotemDummy {
-            Self::windfury_totem(fight).on_dummy_gain(fight);
+            let imbue_blocks = Self::windfury_imbue_blocks_totem(fight);
+            Self::windfury_totem(fight).on_dummy_gain(fight, imbue_blocks);
         }
         if kind == ShamanAura::WindfuryImbue {
             let state = fight
@@ -1700,6 +1759,7 @@ impl Agent for ShamanAgent {
                 .clone()
                 .expect("Windfury Weapon is bound");
             state.on_trigger_gain(fight);
+            Self::windfury_imbue_changed(fight);
         }
     }
 
@@ -1794,6 +1854,7 @@ impl Agent for ShamanAgent {
                     .clone()
                     .expect("Windfury Weapon is bound");
                 state.on_trigger_expire(fight);
+                Self::windfury_imbue_changed(fight);
             }
             ShamanAura::FlametongueTotem => {
                 let trigger = fight

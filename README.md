@@ -872,6 +872,23 @@ the Go goldens and exporter uses. The departures:
   the 200 mana to any wearer with a mana bar, a spell batch window after the hit, as the Hunter's
   does (the prepared effect is `mana_proc`, `src/prepare/export_items.rs`); a Hunter keeps
   `hunter_set_mana_proc`, and the reference rules still refuse it.
+- Fire totem reach, from the client 1.60.1.70755 rows and tooltips: a fire totem stands where
+  the shaman drops it, "at the feet of the caster", which the fight models as the shaman's
+  distance from the targets at the cast (one distance for every target, so a totem reaches all
+  of them or none). Magma Totem's pulse burns enemies within 8 yards of it (10581's area), Fire
+  Nova hits "enemies within 10 yd of your active Fire totem" (408428's area) and Searing Totem
+  attacks an enemy within 20 yards (10436's range). Out of reach the totem is still dropped and
+  the nova still cast, for their mana and global cooldown, and deal nothing; moving after the
+  drop does not move the totem. The reference hits every target from any distance, as upstream
+  wowsims does (`radius_yards` and `attack_range_yards` on the prepared effects,
+  `tests/forever_totems_20261104.rs`).
+- The shaman's own Windfury Totem beside the party's or a main hand Windfury Weapon: both totems
+  give the same party aura, 10612, which neither stacks (no cumulative aura) nor stacks for
+  different casters, and every rank of Windfury Weapon "disables any benefit you personally
+  receive from Windfury Totem" when applied to the main hand. Under Forever's rules the own
+  totem is cast (air slot, mana, global cooldown) and its trigger stays off while the party's
+  totem stands or the imbue is up; an item swap that takes the imbue off lets it back on at
+  once. The reference refuses the request, as before (`one_aura` on `windfury_totem_self`).
 
 ## Repository layout
 

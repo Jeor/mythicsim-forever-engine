@@ -167,8 +167,8 @@ fn claims(effect: &Effect) -> Vec<(&'static str, &str)> {
 }
 
 /// Basic totems other than Strength of Earth, Grace of Air, Mana Spring and Windfury have no
-/// behavior; a Windfury cast would contest the party's Windfury Totem or a main hand Windfury
-/// Weapon, and a Flametongue Totem would share the party totem's benefit, which the runtime does
+/// behavior; under the reference's export a Windfury cast would contest the party's Windfury
+/// Totem or a main hand Windfury Weapon, and a Flametongue Totem would share the party totem's benefit, which the runtime does
 /// not model. Since the 16 October 2026 beta notes nothing contests a Grace of Air cast.
 fn limits(prepared: &PreparedV2, reachable: &[&Spell]) -> Vec<String> {
     let mut reasons = Vec::new();
@@ -204,9 +204,12 @@ fn limits(prepared: &PreparedV2, reachable: &[&Spell]) -> Vec<String> {
                 _ => false,
             });
             match effect {
+                // Under Forever's rules the runtime keeps a contested totem's trigger off
+                // (`one_aura`), so only the reference's export is refused.
                 Effect::WindfuryTotemSelf {
                     spell_id,
                     contested,
+                    one_aura: false,
                     ..
                 } if (*contested || swapped_contested)
                     && *spell_id == id.spell_id

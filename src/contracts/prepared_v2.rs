@@ -3925,10 +3925,15 @@ pub enum Effect {
         spell_id: i32,
         flame_shock_bonus: f64,
     },
-    /// Fire Nova: one hit on each target from a fixed base.
+    /// Fire Nova: one hit on each target from a fixed base. Under Forever's rules
+    /// `radius_yards` is the hit's radius around the active fire totem (408428's area, 10 yards):
+    /// the nova reaches nothing when that totem was dropped farther from the targets. Zero, as
+    /// the reference exports it, reaches every target.
     FireNova {
         spell_id: i32,
         base_damage: f64,
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        radius_yards: f64,
     },
     /// Searing Totem: a target dot whose ticks cast the totem's attack.
     SearingTotem {
@@ -3939,6 +3944,11 @@ pub enum Effect {
         flametongue_totem_aura: String,
         /// The fire totem's lifetime, for `totemRemainingTime`.
         duration_ns: i64,
+        /// Under Forever's rules the attack's range from the totem (10436's, 20 yards): the
+        /// totem does not attack a target farther from where it was dropped. Zero, as the
+        /// reference exports it, reaches every target.
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        attack_range_yards: f64,
     },
     /// Earth Shock: a binary hit from the highest rank's damage roll.
     EarthShock {
@@ -3999,10 +4009,15 @@ pub enum Effect {
         chances: Vec<SpellChance>,
     },
     /// Magma Totem: an area dot on the shaman whose pulses roll hit and crit on each target.
+    /// Under Forever's rules `radius_yards` is the pulse's radius around the totem (10581's area,
+    /// 8 yards), which stands where the shaman dropped it: the pulses reach nothing when that is
+    /// farther from the targets. Zero, as the reference exports it, reaches every target.
     MagmaTotem {
         spell_id: i32,
         pulse_damage: f64,
         duration_ns: i64,
+        #[serde(default, skip_serializing_if = "is_zero_f64")]
+        radius_yards: f64,
     },
     /// Lightning Shield: the cast puts up every charge; without a shield proc rate the orbs
     /// never fire.
@@ -4035,7 +4050,9 @@ pub enum Effect {
     /// aura every period, the dummy's exclusive effect turns the trigger on, and the trigger
     /// grants the proc aura's charges and an extra main hand attack. Spellbook positions name
     /// the spells; `contested` says the party's Windfury Totem or a main hand imbue would contest
-    /// it.
+    /// it. Under Forever's rules `one_aura` says the party's totem and the shaman's own are the
+    /// same aura (10612), and a main hand Windfury Weapon turns off the benefit of either: while
+    /// one of them holds it, the own totem's trigger stays off instead of being refused.
     WindfuryTotemSelf {
         spell_id: i32,
         totem_aura: String,
@@ -4053,6 +4070,8 @@ pub enum Effect {
         proc_gain_log: String,
         proc_expire_log: String,
         contested: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        one_aura: bool,
     },
     /// Mana Spring Totem: the water totem's aura, whose MP5 is a class stat aura.
     ManaSpringTotem {
